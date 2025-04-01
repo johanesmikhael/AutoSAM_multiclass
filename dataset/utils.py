@@ -2,7 +2,7 @@ import os
 import pickle
 from dataset.Synapse import SynapseDataset
 from dataset.ACDC import AcdcDataset
-from dataset.SliceLoader import SliceDataset
+# from dataset.SliceLoader import SliceDataset
 import torch
 
 

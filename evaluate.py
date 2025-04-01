@@ -5,7 +5,7 @@ import os
 import SimpleITK as sitk
 import numpy as np
 import argparse
-from medpy import metric
+# from medpy import metric
 import argparse
 
 
@@ -20,12 +20,12 @@ def dice(pred, label):
         return 2. * np.logical_and(pred, label).sum() / (pred.sum() + label.sum())
 
 
-def hd(pred, gt):
-    if pred.sum() > 0 and gt.sum() > 0:
-        hd95 = metric.binary.hd95(pred, gt)
-        return hd95
-    else:
-        return 0
+# def hd(pred, gt):
+#     if pred.sum() > 0 and gt.sum() > 0:
+#         hd95 = metric.binary.hd95(pred, gt)
+#         return hd95
+#     else:
+#         return 0
 
 
 def test_brats(args):
@@ -36,9 +36,9 @@ def test_brats(args):
     Dice_tc = []
     Dice_wt = []
 
-    HD_et = []
-    HD_tc = []
-    HD_wt = []
+    # HD_et = []
+    # HD_tc = []
+    # HD_wt = []
 
     def process_label(label):
         net = label == 2
@@ -61,15 +61,15 @@ def test_brats(args):
         Dice_tc.append(dice(infer_tc, label_tc))
         Dice_wt.append(dice(infer_wt, label_wt))
 
-        HD_et.append(hd(infer_et, label_et))
-        HD_tc.append(hd(infer_tc, label_tc))
-        HD_wt.append(hd(infer_wt, label_wt))
+        # HD_et.append(hd(infer_et, label_et))
+        # HD_tc.append(hd(infer_tc, label_tc))
+        # HD_wt.append(hd(infer_wt, label_wt))
 
         fw.write('*' * 20 + '\n', )
         fw.write(infer_path.split('/')[-1] + '\n')
-        fw.write('hd_et: {:.4f}\n'.format(HD_et[-1]))
-        fw.write('hd_tc: {:.4f}\n'.format(HD_tc[-1]))
-        fw.write('hd_wt: {:.4f}\n'.format(HD_wt[-1]))
+        # fw.write('hd_et: {:.4f}\n'.format(HD_et[-1]))
+        # fw.write('hd_tc: {:.4f}\n'.format(HD_tc[-1]))
+        # fw.write('hd_wt: {:.4f}\n'.format(HD_wt[-1]))
         fw.write('*' * 20 + '\n', )
         fw.write('Dice_et: {:.4f}\n'.format(Dice_et[-1]))
         fw.write('Dice_tc: {:.4f}\n'.format(Dice_tc[-1]))
@@ -84,20 +84,20 @@ def test_brats(args):
     dsc.append(np.mean(Dice_tc))
     dsc.append(np.mean(Dice_wt))
 
-    avg_hd.append(np.mean(HD_et))
-    avg_hd.append(np.mean(HD_tc))
-    avg_hd.append(np.mean(HD_wt))
+    # avg_hd.append(np.mean(HD_et))
+    # avg_hd.append(np.mean(HD_tc))
+    # avg_hd.append(np.mean(HD_wt))
 
     fw.write('Dice_et' + str(np.mean(Dice_et)) + ' ' + '\n')
     fw.write('Dice_tc' + str(np.mean(Dice_tc)) + ' ' + '\n')
     fw.write('Dice_wt' + str(np.mean(Dice_wt)) + ' ' + '\n')
 
-    fw.write('HD_et' + str(np.mean(HD_et)) + ' ' + '\n')
-    fw.write('HD_tc' + str(np.mean(HD_tc)) + ' ' + '\n')
-    fw.write('HD_wt' + str(np.mean(HD_wt)) + ' ' + '\n')
+    # fw.write('HD_et' + str(np.mean(HD_et)) + ' ' + '\n')
+    # fw.write('HD_tc' + str(np.mean(HD_tc)) + ' ' + '\n')
+    # fw.write('HD_wt' + str(np.mean(HD_wt)) + ' ' + '\n')
 
     fw.write('Dice' + str(np.mean(dsc)) + ' ' + '\n')
-    fw.write('HD' + str(np.mean(avg_hd)) + ' ' + '\n')
+    # fw.write('HD' + str(np.mean(avg_hd)) + ' ' + '\n')
     fw.close()
     with open(args.save_dir + '/dice_pre.txt', 'r') as f:
         lines = f.read().splitlines()
@@ -113,9 +113,9 @@ def test_acdc(args):
     Dice_myo = []
     Dice_lv = []
 
-    hd_rv = []
-    hd_myo = []
-    hd_lv = []
+    # hd_rv = []
+    # hd_myo = []
+    # hd_lv = []
 
     def process_label(label):
         rv = label == 1
@@ -138,24 +138,24 @@ def test_acdc(args):
         Dice_myo.append(dice(infer_myo, label_myo))
         Dice_lv.append(dice(infer_lv, label_lv))
 
-        hd_rv.append(hd(infer_rv, label_rv))
-        hd_myo.append(hd(infer_myo, label_myo))
-        hd_lv.append(hd(infer_lv, label_lv))
+        # hd_rv.append(hd(infer_rv, label_rv))
+        # hd_myo.append(hd(infer_myo, label_myo))
+        # hd_lv.append(hd(infer_lv, label_lv))
 
         fw.write('*' * 20 + '\n', )
         fw.write(infer_path.split('/')[-1] + '\n')
-        fw.write('hd_rv: {:.4f}\n'.format(hd_rv[-1]))
-        fw.write('hd_myo: {:.4f}\n'.format(hd_myo[-1]))
-        fw.write('hd_lv: {:.4f}\n'.format(hd_lv[-1]))
+        # fw.write('hd_rv: {:.4f}\n'.format(hd_rv[-1]))
+        # fw.write('hd_myo: {:.4f}\n'.format(hd_myo[-1]))
+        # fw.write('hd_lv: {:.4f}\n'.format(hd_lv[-1]))
         # fw.write('*'*20+'\n')
         fw.write('*' * 20 + '\n', )
         fw.write(infer_path.split('/')[-1] + '\n')
         fw.write('Dice_rv: {:.4f}\n'.format(Dice_rv[-1]))
         fw.write('Dice_myo: {:.4f}\n'.format(Dice_myo[-1]))
         fw.write('Dice_lv: {:.4f}\n'.format(Dice_lv[-1]))
-        fw.write('hd_rv: {:.4f}\n'.format(hd_rv[-1]))
-        fw.write('hd_myo: {:.4f}\n'.format(hd_myo[-1]))
-        fw.write('hd_lv: {:.4f}\n'.format(hd_lv[-1]))
+        # fw.write('hd_rv: {:.4f}\n'.format(hd_rv[-1]))
+        # fw.write('hd_myo: {:.4f}\n'.format(hd_myo[-1]))
+        # fw.write('hd_lv: {:.4f}\n'.format(hd_lv[-1]))
         fw.write('*' * 20 + '\n')
 
     # fw.write('*'*20+'\n')
@@ -170,24 +170,24 @@ def test_acdc(args):
     fw.write('Dice_rv' + str(np.mean(Dice_rv)) + '\n')
     fw.write('Dice_myo' + str(np.mean(Dice_myo)) + '\n')
     fw.write('Dice_lv' + str(np.mean(Dice_lv)) + '\n')
-    fw.write('Mean_HD\n')
-    fw.write('HD_rv' + str(np.mean(hd_rv)) + '\n')
-    fw.write('HD_myo' + str(np.mean(hd_myo)) + '\n')
-    fw.write('HD_lv' + str(np.mean(hd_lv)) + '\n')
+    # fw.write('Mean_HD\n')
+    # fw.write('HD_rv' + str(np.mean(hd_rv)) + '\n')
+    # fw.write('HD_myo' + str(np.mean(hd_myo)) + '\n')
+    # fw.write('HD_lv' + str(np.mean(hd_lv)) + '\n')
     fw.write('*' * 20 + '\n')
 
     dsc = []
     dsc.append(np.mean(Dice_rv))
     dsc.append(np.mean(Dice_myo))
     dsc.append(np.mean(Dice_lv))
-    avg_hd = []
-    avg_hd.append(np.mean(hd_rv))
-    avg_hd.append(np.mean(hd_myo))
-    avg_hd.append(np.mean(hd_lv))
-    fw.write('avg_hd:' + str(np.mean(avg_hd)) + '\n')
+    # avg_hd = []
+    # avg_hd.append(np.mean(hd_rv))
+    # avg_hd.append(np.mean(hd_myo))
+    # avg_hd.append(np.mean(hd_lv))
+    # fw.write('avg_hd:' + str(np.mean(avg_hd)) + '\n')
 
     fw.write('DSC:' + str(np.mean(dsc)) + '\n')
-    fw.write('HD:' + str(np.mean(avg_hd)) + '\n')
+    # fw.write('HD:' + str(np.mean(avg_hd)) + '\n')
 
     print('done')
     fw.close()
@@ -209,14 +209,14 @@ def test_synapse(args):
     Dice_aorta = []
     Dice_pancreas = []
 
-    hd_spleen = []
-    hd_right_kidney = []
-    hd_left_kidney = []
-    hd_gallbladder = []
-    hd_liver = []
-    hd_stomach = []
-    hd_aorta = []
-    hd_pancreas = []
+    # hd_spleen = []
+    # hd_right_kidney = []
+    # hd_left_kidney = []
+    # hd_gallbladder = []
+    # hd_liver = []
+    # hd_stomach = []
+    # hd_aorta = []
+    # hd_pancreas = []
 
     def process_label(label):
         spleen = label == 1
@@ -262,26 +262,26 @@ def test_synapse(args):
         fw.write('Dice_aorta: {:.4f}\n'.format(Dice_aorta[-1]))
         fw.write('Dice_pancreas: {:.4f}\n'.format(Dice_pancreas[-1]))
 
-        hd_spleen.append(hd(infer_spleen, label_spleen))
-        hd_right_kidney.append(hd(infer_right_kidney, label_right_kidney))
-        hd_left_kidney.append(hd(infer_left_kidney, label_left_kidney))
-        hd_gallbladder.append(hd(infer_gallbladder, label_gallbladder))
-        hd_liver.append(hd(infer_liver, label_liver))
-        hd_stomach.append(hd(infer_stomach, label_stomach))
-        hd_aorta.append(hd(infer_aorta, label_aorta))
-        hd_pancreas.append(hd(infer_pancreas, label_pancreas))
+        # hd_spleen.append(hd(infer_spleen, label_spleen))
+        # hd_right_kidney.append(hd(infer_right_kidney, label_right_kidney))
+        # hd_left_kidney.append(hd(infer_left_kidney, label_left_kidney))
+        # hd_gallbladder.append(hd(infer_gallbladder, label_gallbladder))
+        # hd_liver.append(hd(infer_liver, label_liver))
+        # hd_stomach.append(hd(infer_stomach, label_stomach))
+        # hd_aorta.append(hd(infer_aorta, label_aorta))
+        # hd_pancreas.append(hd(infer_pancreas, label_pancreas))
 
-        fw.write('hd_spleen: {:.4f}\n'.format(hd_spleen[-1]))
-        fw.write('hd_right_kidney: {:.4f}\n'.format(hd_right_kidney[-1]))
-        fw.write('hd_left_kidney: {:.4f}\n'.format(hd_left_kidney[-1]))
-        fw.write('hd_gallbladder: {:.4f}\n'.format(hd_gallbladder[-1]))
-        fw.write('hd_liver: {:.4f}\n'.format(hd_liver[-1]))
-        fw.write('hd_stomach: {:.4f}\n'.format(hd_stomach[-1]))
-        fw.write('hd_aorta: {:.4f}\n'.format(hd_aorta[-1]))
-        fw.write('hd_pancreas: {:.4f}\n'.format(hd_pancreas[-1]))
+        # fw.write('hd_spleen: {:.4f}\n'.format(hd_spleen[-1]))
+        # fw.write('hd_right_kidney: {:.4f}\n'.format(hd_right_kidney[-1]))
+        # fw.write('hd_left_kidney: {:.4f}\n'.format(hd_left_kidney[-1]))
+        # fw.write('hd_gallbladder: {:.4f}\n'.format(hd_gallbladder[-1]))
+        # fw.write('hd_liver: {:.4f}\n'.format(hd_liver[-1]))
+        # fw.write('hd_stomach: {:.4f}\n'.format(hd_stomach[-1]))
+        # fw.write('hd_aorta: {:.4f}\n'.format(hd_aorta[-1]))
+        # fw.write('hd_pancreas: {:.4f}\n'.format(hd_pancreas[-1]))
 
         dsc = []
-        HD = []
+        # HD = []
         dsc.append(Dice_spleen[-1])
         dsc.append((Dice_right_kidney[-1]))
         dsc.append(Dice_left_kidney[-1])
@@ -292,15 +292,15 @@ def test_synapse(args):
         dsc.append(np.mean(Dice_pancreas[-1]))
         fw.write('DSC:' + str(np.mean(dsc)) + '\n')
 
-        HD.append(hd_spleen[-1])
-        HD.append(hd_right_kidney[-1])
-        HD.append(hd_left_kidney[-1])
-        HD.append(hd_gallbladder[-1])
-        HD.append(hd_liver[-1])
-        HD.append(hd_stomach[-1])
-        HD.append(hd_aorta[-1])
-        HD.append(hd_pancreas[-1])
-        fw.write('hd:' + str(np.mean(HD)) + '\n')
+        # HD.append(hd_spleen[-1])
+        # HD.append(hd_right_kidney[-1])
+        # HD.append(hd_left_kidney[-1])
+        # HD.append(hd_gallbladder[-1])
+        # HD.append(hd_liver[-1])
+        # HD.append(hd_stomach[-1])
+        # HD.append(hd_aorta[-1])
+        # HD.append(hd_pancreas[-1])
+        # fw.write('hd:' + str(np.mean(HD)) + '\n')
 
     fw.write('*' * 20 + '\n')
     fw.write('Mean_Dice\n')
@@ -313,15 +313,15 @@ def test_synapse(args):
     fw.write('Dice_aorta' + str(np.mean(Dice_aorta)) + '\n')
     fw.write('Dice_pancreas' + str(np.mean(Dice_pancreas)) + '\n')
 
-    fw.write('Mean_hd\n')
-    fw.write('hd_spleen' + str(np.mean(hd_spleen)) + '\n')
-    fw.write('hd_right_kidney' + str(np.mean(hd_right_kidney)) + '\n')
-    fw.write('hd_left_kidney' + str(np.mean(hd_left_kidney)) + '\n')
-    fw.write('hd_gallbladder' + str(np.mean(hd_gallbladder)) + '\n')
-    fw.write('hd_liver' + str(np.mean(hd_liver)) + '\n')
-    fw.write('hd_stomach' + str(np.mean(hd_stomach)) + '\n')
-    fw.write('hd_aorta' + str(np.mean(hd_aorta)) + '\n')
-    fw.write('hd_pancreas' + str(np.mean(hd_pancreas)) + '\n')
+    # fw.write('Mean_hd\n')
+    # fw.write('hd_spleen' + str(np.mean(hd_spleen)) + '\n')
+    # fw.write('hd_right_kidney' + str(np.mean(hd_right_kidney)) + '\n')
+    # fw.write('hd_left_kidney' + str(np.mean(hd_left_kidney)) + '\n')
+    # fw.write('hd_gallbladder' + str(np.mean(hd_gallbladder)) + '\n')
+    # fw.write('hd_liver' + str(np.mean(hd_liver)) + '\n')
+    # fw.write('hd_stomach' + str(np.mean(hd_stomach)) + '\n')
+    # fw.write('hd_aorta' + str(np.mean(hd_aorta)) + '\n')
+    # fw.write('hd_pancreas' + str(np.mean(hd_pancreas)) + '\n')
 
     fw.write('*' * 20 + '\n')
 
@@ -336,16 +336,16 @@ def test_synapse(args):
     dsc.append(np.mean(Dice_pancreas))
     fw.write('dsc:' + str(np.mean(dsc)) + '\n')
 
-    HD = []
-    HD.append(np.mean(hd_spleen))
-    HD.append(np.mean(hd_right_kidney))
-    HD.append(np.mean(hd_left_kidney))
-    HD.append(np.mean(hd_gallbladder))
-    HD.append(np.mean(hd_liver))
-    HD.append(np.mean(hd_stomach))
-    HD.append(np.mean(hd_aorta))
-    HD.append(np.mean(hd_pancreas))
-    fw.write('hd:' + str(np.mean(HD)) + '\n')
+    # HD = []
+    # HD.append(np.mean(hd_spleen))
+    # HD.append(np.mean(hd_right_kidney))
+    # HD.append(np.mean(hd_left_kidney))
+    # HD.append(np.mean(hd_gallbladder))
+    # HD.append(np.mean(hd_liver))
+    # HD.append(np.mean(hd_stomach))
+    # HD.append(np.mean(hd_aorta))
+    # HD.append(np.mean(hd_pancreas))
+    # fw.write('hd:' + str(np.mean(HD)) + '\n')
 
     print('done')
     fw.close()

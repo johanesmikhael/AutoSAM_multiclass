@@ -1,0 +1,11 @@
+pytorch
+torchvision
+matplotlib
+pycocotools
+opencv-python
+onnx
+onnxruntime
+batchgenerators
+nibabel
+tensorboard
+SimpleITK
