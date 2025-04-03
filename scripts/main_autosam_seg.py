@@ -10,6 +10,7 @@ import pickle
 import numpy as np
 from datetime import datetime
 import nibabel as nib
+from PIL import Image
 
 import torch
 import torch.nn as nn
