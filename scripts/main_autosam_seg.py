@@ -359,6 +359,55 @@ def validate(val_loader, model, epoch, args, writer):
     return np.mean(loss_list)
 
 
+# def test(model, args):
+#     print('Test')
+#     join = os.path.join
+#     if not os.path.exists(join(args.save_dir, "infer")):
+#         os.mkdir(join(args.save_dir, "infer"))
+#     if not os.path.exists(join(args.save_dir, "label")):
+#         os.mkdir(join(args.save_dir, "label"))
+
+#     split_dir = os.path.join(args.src_dir, "splits.pkl")
+#     with open(split_dir, "rb") as f:
+#         splits = pickle.load(f)
+#     test_keys = splits[args.fold]['test']
+
+#     model.eval()
+
+#     for key in test_keys:
+#         preds = []
+#         labels = []
+#         data_loader = generate_test_loader(key, args)
+#         with torch.no_grad():
+#             for i, tup in enumerate(data_loader):
+#                 if args.gpu is not None:
+#                     img = tup[0].float().cuda(args.gpu, non_blocking=True)
+#                     label = tup[1].long().cuda(args.gpu, non_blocking=True)
+#                 else:
+#                     img = tup[0]
+#                     label = tup[1]
+
+#                 b, c, h, w = img.shape
+
+#                 mask, iou_pred = model(img)
+#                 mask = mask.view(b, -1, h, w)
+#                 mask_softmax = F.softmax(mask, dim=1)
+#                 mask = torch.argmax(mask_softmax, dim=1)
+
+#                 preds.append(mask.cpu().numpy())
+#                 labels.append(label.cpu().numpy())
+
+#             preds = np.concatenate(preds, axis=0)
+#             labels = np.concatenate(labels, axis=0).squeeze()
+#             print(preds.shape, labels.shape)
+#             if "." in key:
+#                 key = key.split(".")[0]
+#             ni_pred = nib.Nifti1Image(preds.astype(np.int8), affine=np.eye(4))
+#             ni_lb = nib.Nifti1Image(labels.astype(np.int8), affine=np.eye(4))
+#             nib.save(ni_pred, join(args.save_dir, 'infer', key + '.nii'))
+#             nib.save(ni_lb, join(args.save_dir, 'label', key + '.nii'))
+#         print("finish saving file:", key)
+
 def test(model, args):
     print('Test')
     join = os.path.join
@@ -378,6 +427,7 @@ def test(model, args):
         preds = []
         labels = []
         data_loader = generate_test_loader(key, args)
+
         with torch.no_grad():
             for i, tup in enumerate(data_loader):
                 if args.gpu is not None:
@@ -397,16 +447,25 @@ def test(model, args):
                 preds.append(mask.cpu().numpy())
                 labels.append(label.cpu().numpy())
 
-            preds = np.concatenate(preds, axis=0)
+            preds = np.concatenate(preds, axis=0)  # shape: (n_slices, H, W)
             labels = np.concatenate(labels, axis=0).squeeze()
-            print(preds.shape, labels.shape)
+
             if "." in key:
                 key = key.split(".")[0]
-            ni_pred = nib.Nifti1Image(preds.astype(np.int8), affine=np.eye(4))
-            ni_lb = nib.Nifti1Image(labels.astype(np.int8), affine=np.eye(4))
-            nib.save(ni_pred, join(args.save_dir, 'infer', key + '.nii'))
-            nib.save(ni_lb, join(args.save_dir, 'label', key + '.nii'))
-        print("finish saving file:", key)
+
+            
+            # Save as PNGs (one file per slice)
+            for idx in range(preds.shape[0]):
+                pred_img = Image.fromarray(preds[idx].astype(np.uint8), mode='L')
+                label_img = Image.fromarray(labels[idx].astype(np.uint8), mode='L')
+
+                pred_img.save(join(join(args.save_dir, "infer"), f"{key}_slice{idx:02d}.png"))
+                label_img.save(join(join(args.save_dir, "label"), f"{key}_slice{idx:02d}.png"))
+
+        print("Finished saving PNGs for:", key)
+
+            
+
 
 def test_2(data_loader, model, args):
     print('Test')
