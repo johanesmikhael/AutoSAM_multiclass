@@ -65,6 +65,8 @@ def generate_test_loader(key, args):
     if args.dataset == 'acdc' or args.dataset == 'ACDC':
         args.img_size = 224
         test_ds = AcdcDataset(keys=key, mode='val', args=args)
+    elif args.dataset == 'material' or args.dataset == 'MATERIAL':
+        test_ds = MaterialDataset(keys=key, mode='val', args=args)
     else:
         raise NotImplementedError("dataset is not supported:", args.dataset)
 

@@ -259,10 +259,10 @@ def main_worker(gpu, ngpus_per_node, args):
                 and args.rank % ngpus_per_node == 0):
             save_checkpoint({
                 'epoch': epoch + 1,
-                'state_dict': model.module.mask_decoder.state_dict(),
+                'state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, filename=filename)
-            
+
     test(model, args)
     if args.dataset == 'synapse':
         test_synapse(args)
