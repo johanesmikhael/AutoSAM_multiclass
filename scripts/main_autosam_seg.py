@@ -255,13 +255,14 @@ def main_worker(gpu, ngpus_per_node, args):
             is_best = True
             best_loss = loss
 
-        # if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-        #         and args.rank % ngpus_per_node == 0):
-        #     save_checkpoint({
-        #         'epoch': epoch + 1,
-        #         'state_dict': model.module.mask_decoder.state_dict(),
-        #         'optimizer' : optimizer.state_dict(),
-        #     }, is_best=is_best, filename=filename)
+        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                and args.rank % ngpus_per_node == 0):
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'state_dict': model.module.mask_decoder.state_dict(),
+                'optimizer' : optimizer.state_dict(),
+            }, is_best=is_best, filename=filename)
+            
     test(model, args)
     if args.dataset == 'synapse':
         test_synapse(args)
