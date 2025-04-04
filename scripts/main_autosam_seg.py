@@ -428,8 +428,8 @@ def test(model, args):
         preds = []
         labels = []
         data_loader = generate_test_loader(key, args)
-
         with torch.no_grad():
+            
             for i, tup in enumerate(data_loader):
                 if args.gpu is not None:
                     img = tup[0].float().cuda(args.gpu, non_blocking=True)
@@ -448,24 +448,31 @@ def test(model, args):
                 preds.append(mask.cpu().numpy())
                 labels.append(label.cpu().numpy())
 
-            preds = np.concatenate(preds, axis=0)  # shape: (n_slices, H, W)
-            labels = np.concatenate(labels, axis=0).squeeze()
+            preds = np.concatenate(preds, axis=0)  # shape: (N, H, W)
+            labels = np.concatenate(labels, axis=0)
 
-            # labels = np.concatenate(labels, axis=0)
             if labels.ndim == 4:
                 labels = labels[:, 0, :, :]
 
             if "." in key:
                 key = key.split(".")[0]
 
+            # Special case: if only 1 slice
+            if preds.shape[0] == 1:
+                pred_img = Image.fromarray(preds[0].astype(np.uint8), mode='L')
+                label_img = Image.fromarray(labels[0].astype(np.uint8), mode='L')
+
+                pred_img.save(join(args.save_dir, "infer", f"{key}.png"))
+                label_img.save(join(args.save_dir, "label", f"{key}.png"))
             
             # Save as PNGs (one file per slice)
             for idx in range(preds.shape[0]):
                 pred_img = Image.fromarray(preds[idx].astype(np.uint8), mode='L')
                 label_img = Image.fromarray(labels[idx].astype(np.uint8), mode='L')
 
-                pred_img.save(join(join(args.save_dir, "infer"), f"{key}_slice{idx:02d}.png"))
-                label_img.save(join(join(args.save_dir, "label"), f"{key}_slice{idx:02d}.png"))
+                pred_img.save(join(join(args.save_dir, "infer"), f"{key}_num{idx:02d}.png"))
+                label_img.save(join(join(args.save_dir, "label"), f"{key}_num{idx:02d}.png"))
+
 
         print("Finished saving PNGs for:", key)
 
