@@ -417,14 +417,14 @@ def test(model, args):
 
                 pred_img.save(join(args.save_dir, "infer", f"{key}.png"))
                 label_img.save(join(args.save_dir, "label", f"{key}.png"))
-            
-            # Save as PNGs (one file per slice)
-            for idx in range(preds.shape[0]):
-                pred_img = Image.fromarray(preds[idx].astype(np.uint8), mode='L')
-                label_img = Image.fromarray(labels[idx].astype(np.uint8), mode='L')
+            else:
+                # Save as PNGs (one file per slice)
+                for idx in range(preds.shape[0]):
+                    pred_img = Image.fromarray(preds[idx].astype(np.uint8), mode='L')
+                    label_img = Image.fromarray(labels[idx].astype(np.uint8), mode='L')
 
-                pred_img.save(join(join(args.save_dir, "infer"), f"{key}_num{idx:02d}.png"))
-                label_img.save(join(join(args.save_dir, "label"), f"{key}_num{idx:02d}.png"))
+                    pred_img.save(join(join(args.save_dir, "infer"), f"{key}_num{idx:02d}.png"))
+                    label_img.save(join(join(args.save_dir, "label"), f"{key}_num{idx:02d}.png"))
 
 
         print("Finished saving PNGs for:", key)
