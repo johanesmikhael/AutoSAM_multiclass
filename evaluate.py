@@ -7,7 +7,7 @@ import numpy as np
 import argparse
 # from medpy import metric
 import argparse
-
+from PIL import Image
 
 def read_nii(path):
     return sitk.GetArrayFromImage(sitk.ReadImage(path))
@@ -352,6 +352,73 @@ def test_synapse(args):
     with open(args.save_dir + '/dice_pre.txt', 'r') as f:
         lines = f.read().splitlines()
         for line in lines:
+            print(line)
+
+
+def test_material(args):
+    # Get sorted lists of PNG files for labels and inferences.
+    label_list = sorted(glob.glob(os.path.join(args.save_dir, 'label', '*png')))
+    infer_list = sorted(glob.glob(os.path.join(args.save_dir, 'infer', '*png')))
+
+    # Define label mapping for material dataset.
+    label_names = {
+        1: 'reinforced_concrete',
+        2: 'unreinforced_concrete',
+        3: 'precast_concrete',
+        4: 'masonry',
+        5: 'slit',
+        6: 'xps_insulation',
+        7: 'hard_insulation',
+        8: 'soft_insulation'
+    }
+    
+    # Initialize dictionary to store Dice scores per label.
+    dice_scores = {label: [] for label in label_names.keys()}
+
+    output_file = os.path.join(args.save_dir, 'dice_pre.txt')
+    with open(output_file, 'a') as fw:
+        for label_path, infer_path in zip(label_list, infer_list):
+            filename = os.path.basename(infer_path)
+            print(filename)
+            print(filename)
+            
+            # Read PNG images (assumed to be single-channel with integer label values)
+            gt = np.array(Image.open(label_path))
+            pred = np.array(Image.open(infer_path))
+            
+            fw.write('*' * 20 + '\n')
+            fw.write(filename + '\n')
+            fw.write('*' * 20 + '\n')
+            fw.write(filename + '\n')
+            
+            # Process each label
+            for label_val, label_name in label_names.items():
+                gt_mask = (gt == label_val).astype(np.uint8)
+                pred_mask = (pred == label_val).astype(np.uint8)
+                score = dice(pred_mask, gt_mask)
+                dice_scores[label_val].append(score)
+                fw.write(f"Dice_{label_name}: {score:.4f}\n")
+            fw.write('*' * 20 + '\n')
+
+        # Write mean Dice scores per label.
+        fw.write('*' * 20 + '\n')
+        fw.write("Mean_Dice\n")
+        overall_scores = []
+        for label_val, label_name in label_names.items():
+            if dice_scores[label_val]:
+                mean_score = np.mean(dice_scores[label_val])
+                overall_scores.extend(dice_scores[label_val])
+            else:
+                mean_score = 0.0
+            fw.write(f"Dice_{label_name}: {mean_score:.4f}\n")
+        overall_mean = np.mean(overall_scores) if overall_scores else 0.0
+        fw.write('*' * 20 + '\n')
+        fw.write(f"DSC: {overall_mean:.4f}\n")
+        fw.write('*' * 20 + '\n')
+
+    print('done')
+    with open(output_file, 'r') as f:
+        for line in f.read().splitlines():
             print(line)
 
 

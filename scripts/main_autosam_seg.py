@@ -34,7 +34,7 @@ from loss_functions.metrics import dice_pytorch, SegmentationMetric
 
 from models import sam_seg_model_registry
 from dataset import generate_dataset, generate_test_loader
-from evaluate import test_synapse, test_acdc, test_brats
+from evaluate import test_synapse, test_acdc, test_brats, test_material
 
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -271,6 +271,8 @@ def main_worker(gpu, ngpus_per_node, args):
         test_acdc(args)
     elif args.dataset == 'brats':
         test_brats(args)
+    elif args.dataset == 'material':
+        # test_material(args)
 
 
 def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
@@ -359,55 +361,6 @@ def validate(val_loader, model, epoch, args, writer):
     writer.add_scalar("val_loss", np.mean(loss_list), epoch)
     return np.mean(loss_list)
 
-
-# def test(model, args):
-#     print('Test')
-#     join = os.path.join
-#     if not os.path.exists(join(args.save_dir, "infer")):
-#         os.mkdir(join(args.save_dir, "infer"))
-#     if not os.path.exists(join(args.save_dir, "label")):
-#         os.mkdir(join(args.save_dir, "label"))
-
-#     split_dir = os.path.join(args.src_dir, "splits.pkl")
-#     with open(split_dir, "rb") as f:
-#         splits = pickle.load(f)
-#     test_keys = splits[args.fold]['test']
-
-#     model.eval()
-
-#     for key in test_keys:
-#         preds = []
-#         labels = []
-#         data_loader = generate_test_loader(key, args)
-#         with torch.no_grad():
-#             for i, tup in enumerate(data_loader):
-#                 if args.gpu is not None:
-#                     img = tup[0].float().cuda(args.gpu, non_blocking=True)
-#                     label = tup[1].long().cuda(args.gpu, non_blocking=True)
-#                 else:
-#                     img = tup[0]
-#                     label = tup[1]
-
-#                 b, c, h, w = img.shape
-
-#                 mask, iou_pred = model(img)
-#                 mask = mask.view(b, -1, h, w)
-#                 mask_softmax = F.softmax(mask, dim=1)
-#                 mask = torch.argmax(mask_softmax, dim=1)
-
-#                 preds.append(mask.cpu().numpy())
-#                 labels.append(label.cpu().numpy())
-
-#             preds = np.concatenate(preds, axis=0)
-#             labels = np.concatenate(labels, axis=0).squeeze()
-#             print(preds.shape, labels.shape)
-#             if "." in key:
-#                 key = key.split(".")[0]
-#             ni_pred = nib.Nifti1Image(preds.astype(np.int8), affine=np.eye(4))
-#             ni_lb = nib.Nifti1Image(labels.astype(np.int8), affine=np.eye(4))
-#             nib.save(ni_pred, join(args.save_dir, 'infer', key + '.nii'))
-#             nib.save(ni_lb, join(args.save_dir, 'label', key + '.nii'))
-#         print("finish saving file:", key)
 
 def test(model, args):
     print('Test')
