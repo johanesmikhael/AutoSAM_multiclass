@@ -451,6 +451,10 @@ def test(model, args):
             preds = np.concatenate(preds, axis=0)  # shape: (n_slices, H, W)
             labels = np.concatenate(labels, axis=0).squeeze()
 
+            # labels = np.concatenate(labels, axis=0)
+            if labels.ndim == 4:
+                labels = labels[:, 0, :, :]
+
             if "." in key:
                 key = key.split(".")[0]
 
