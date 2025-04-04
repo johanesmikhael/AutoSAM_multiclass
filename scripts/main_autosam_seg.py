@@ -272,7 +272,7 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.dataset == 'brats':
         test_brats(args)
     elif args.dataset == 'material':
-        # test_material(args)
+        test_material(args)
 
 
 def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
