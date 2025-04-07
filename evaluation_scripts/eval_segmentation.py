@@ -8,6 +8,7 @@ from PIL import Image
 
 from models import sam_seg_model_registry
 from dataset import generate_test_loader
+from evaluate import test_material
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Evaluate segmentation model')
@@ -135,6 +136,10 @@ def main():
     args = parse_args()
     args.distributed = False
     evaluate_model(args)
+
+    if args.dataset == 'material':
+        test_material(args)
+
 
 if __name__ == '__main__':
     print('eval')
