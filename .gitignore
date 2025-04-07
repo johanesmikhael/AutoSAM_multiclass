@@ -41,3 +41,5 @@ cp/
 data/
 explore*
 euler*
+
+evaluate_material.ipynb
