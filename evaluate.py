@@ -395,9 +395,16 @@ def test_material(args):
             for label_val, label_name in label_names.items():
                 gt_mask = (gt == label_val).astype(np.uint8)
                 pred_mask = (pred == label_val).astype(np.uint8)
-                score = dice(pred_mask, gt_mask)
-                dice_scores[label_val].append(score)
-                fw.write(f"Dice_{label_name}: {score:.4f}\n")
+                # Only calculate Dice score if there is something to segment in the ground truth.
+                if gt_mask.sum() > 0:
+                    score = dice(pred_mask, gt_mask)
+                    dice_scores[label_val].append(score)
+                    fw.write(f"Dice_{label_name}: {score:.4f}\n")
+                else:
+                    fw.write(f"Dice_{label_name}: skipped (empty ground truth)\n")                
+                # score = dice(pred_mask, gt_mask)
+                # dice_scores[label_val].append(score)
+                # fw.write(f"Dice_{label_name}: {score:.4f}\n")
             fw.write('*' * 20 + '\n')
 
         # Write mean Dice scores per label.
