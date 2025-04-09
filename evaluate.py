@@ -443,7 +443,7 @@ def test_material(args):
                 overall_scores.extend(dice_scores[label_val])
             else:
                 mean_score = 0.0
-            fw.write(f"Dice_{label_name}: {mean_score:.4f}\n")
+            fw_dice.write(f"Dice_{label_name}: {mean_score:.4f}\n")
         overall_mean = np.mean(overall_scores) if overall_scores else 0.0
         fw_dice.write('*' * 20 + '\n')
         fw_dice.write(f"DSC: {overall_mean:.4f}\n")
