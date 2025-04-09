@@ -42,6 +42,6 @@ data/
 explore*
 euler*
 
-evaluate_material.ipynb
-output_experiment/
+evaluate_material*
+output_experiment*
 dataset/visualization.py

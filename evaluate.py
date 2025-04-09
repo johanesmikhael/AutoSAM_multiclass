@@ -18,6 +18,16 @@ def dice(pred, label):
         return 1
     else:
         return 2. * np.logical_and(pred, label).sum() / (pred.sum() + label.sum())
+    
+
+def iou(pred, label):
+    intersection = np.logical_and(pred, label).sum()
+    union = np.logical_or(pred, label).sum()
+    if union == 0:
+        # If both the prediction and label are empty, return perfect score.
+        return 1
+    else:
+        return intersection / union
 
 
 # def hd(pred, gt):
@@ -374,9 +384,13 @@ def test_material(args):
     
     # Initialize dictionary to store Dice scores per label.
     dice_scores = {label: [] for label in label_names.keys()}
+    # Initialize dictionary to store IoU scores per label.
+    iou_scores = {label: [] for label in label_names.keys()}
 
-    output_file = os.path.join(args.save_dir, 'dice_pre.txt')
-    with open(output_file, 'a') as fw:
+    dice_file = os.path.join(args.save_dir, 'dice_pre.txt')
+    iou_file = os.path.join(args.save_dir, 'iou_pre.txt')
+
+    with open(dice_file, 'a') as fw_dice, open(iou_file, 'a') as fw_iou:
         for label_path, infer_path in zip(label_list, infer_list):
             filename = os.path.basename(infer_path)
             print(filename)
@@ -386,10 +400,15 @@ def test_material(args):
             gt = np.array(Image.open(label_path))
             pred = np.array(Image.open(infer_path))
             
-            fw.write('*' * 20 + '\n')
-            fw.write(filename + '\n')
-            fw.write('*' * 20 + '\n')
-            fw.write(filename + '\n')
+            fw_dice.write('*' * 20 + '\n')
+            fw_dice.write(filename + '\n')
+            fw_dice.write('*' * 20 + '\n')
+            fw_dice.write(filename + '\n')
+            
+            fw_iou.write('*' * 20 + '\n')
+            fw_iou.write(filename + '\n')
+            fw_iou.write('*' * 20 + '\n')
+            fw_iou.write(filename + '\n')
             
             # Process each label
             for label_val, label_name in label_names.items():
@@ -399,17 +418,24 @@ def test_material(args):
                 if gt_mask.sum() > 0:
                     score = dice(pred_mask, gt_mask)
                     dice_scores[label_val].append(score)
-                    fw.write(f"Dice_{label_name}: {score:.4f}\n")
+                    fw_dice.write(f"Dice_{label_name}: {score:.4f}\n")
+                    iou_score = iou(pred_mask, gt_mask)
+                    iou_scores[label_val].append(iou_score)
+                    fw_iou.write(f"IoU_{label_name}: {iou_score:.4f}\n")
                 else:
-                    fw.write(f"Dice_{label_name}: skipped (empty ground truth)\n")                
+                    fw_dice.write(f"Dice_{label_name}: skipped (empty ground truth)\n")
+                    fw_iou.write(f"IoU_{label_name}: skipped (empty ground truth)\n")
+
                 # score = dice(pred_mask, gt_mask)
                 # dice_scores[label_val].append(score)
                 # fw.write(f"Dice_{label_name}: {score:.4f}\n")
-            fw.write('*' * 20 + '\n')
+            fw_dice.write('*' * 20 + '\n')
+            fw_iou.write('*' * 20 + '\n')
+
 
         # Write mean Dice scores per label.
-        fw.write('*' * 20 + '\n')
-        fw.write("Mean_Dice\n")
+        fw_dice.write('*' * 20 + '\n')
+        fw_dice.write("Mean_Dice\n")
         overall_scores = []
         for label_val, label_name in label_names.items():
             if dice_scores[label_val]:
@@ -419,12 +445,31 @@ def test_material(args):
                 mean_score = 0.0
             fw.write(f"Dice_{label_name}: {mean_score:.4f}\n")
         overall_mean = np.mean(overall_scores) if overall_scores else 0.0
-        fw.write('*' * 20 + '\n')
-        fw.write(f"DSC: {overall_mean:.4f}\n")
-        fw.write('*' * 20 + '\n')
+        fw_dice.write('*' * 20 + '\n')
+        fw_dice.write(f"DSC: {overall_mean:.4f}\n")
+        fw_dice.write('*' * 20 + '\n')
 
-    print('done')
-    with open(output_file, 'r') as f:
+        fw_iou.write('*' * 20 + '\n')
+        fw_iou.write("Mean_IoU\n")
+        overall_iou_scores = []
+        for label_val, label_name in label_names.items():
+            if iou_scores[label_val]:
+                mean_iou = np.mean(iou_scores[label_val])
+                overall_iou_scores.extend(iou_scores[label_val])
+            else:
+                mean_iou = 0.0
+            fw_iou.write(f"IoU_{label_name}: {mean_iou:.4f}\n")
+        overall_iou_mean = np.mean(overall_iou_scores) if overall_iou_scores else 0.0
+        fw_iou.write('*' * 20 + '\n')
+        fw_iou.write(f"Mean IoU: {overall_iou_mean:.4f}\n")
+        fw_iou.write('*' * 20 + '\n')
+
+    print("Dice Scores:")
+    with open(dice_file, 'r') as f:
+        for line in f.read().splitlines():
+            print(line)
+    print("\nIoU Scores:")
+    with open(iou_file, 'r') as f:
         for line in f.read().splitlines():
             print(line)
 
