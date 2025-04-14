@@ -110,7 +110,7 @@ def soft_dice_per_batch_2(net_output, gt, smooth=1., smooth_in_nom=1., backgroun
     if net_output.device.type == "cuda":
         weights = weights.cuda(net_output.device.index)
     if rebalance_weights is not None:
-        rebalance_weights = torch.from_numpy(rebalance_weights).float()
+        # rebalance_weights = torch.from_numpy(rebalance_weights).float()
         if net_output.device.type == "cuda":
             rebalance_weights = rebalance_weights.cuda(net_output.device.index)
         intersect = intersect * rebalance_weights

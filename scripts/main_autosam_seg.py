@@ -27,6 +27,8 @@ import torchvision.datasets as datasets
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torchvision.models as models
+import json
+
 
 
 from loss_functions.dice_loss import SoftDiceLoss
@@ -98,6 +100,8 @@ parser.add_argument("--load_saved_model", action='store_true',
 parser.add_argument("--saved_model_path", type=str, default=None)
 parser.add_argument("--load_pseudo_label", default=False, action='store_true')
 parser.add_argument("--dataset", type=str, default="synapse")
+parser.add_argument('--class_weights', type=str, default='', 
+                    help="Path to the JSON file that contains the class weights")
 
 
 def main():
@@ -194,6 +198,15 @@ def main_worker(gpu, ngpus_per_node, args):
         # AllGather implementation (batch shuffle, queue update, etc.) in
         # this code only supports DistributedDataParallel.
         raise NotImplementedError("Only DistributedDataParallel is supported.")
+    
+
+    if args.gpu is not None:
+        device = torch.device("cuda", args.gpu)
+    else:
+        device = torch.device("cpu")
+
+    # Load class weights if provided
+    class_weights_tensor = load_class_weights(args.class_weights, args.num_classes, device)
 
     # freeze weights in the image_encoder
     for name, param in model.named_parameters():
@@ -249,8 +262,8 @@ def main_worker(gpu, ngpus_per_node, args):
         writer.add_scalar("lr", optimizer.param_groups[0]["lr"], global_step=epoch)
 
         # train for one epoch
-        train(train_loader, model, optimizer, scheduler, epoch, args, writer)
-        loss = validate(val_loader, model, epoch, args, writer)
+        train(train_loader, model, optimizer, scheduler, epoch, args, writer, class_weights_tensor)
+        loss = validate(val_loader, model, epoch, args, writer, class_weights_tensor)
 
         if loss < best_loss:
             is_best = True
@@ -275,12 +288,20 @@ def main_worker(gpu, ngpus_per_node, args):
         test_material(args)
 
 
-def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
+def train(train_loader, model, optimizer, scheduler, epoch, args, writer, class_weights_tensor):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
-    ce_loss = torch.nn.CrossEntropyLoss()
+    # ce_loss = torch.nn.CrossEntropyLoss()
+
+
+    if class_weights_tensor is not None:
+        ce_loss = torch.nn.CrossEntropyLoss(weight=class_weights_tensor)
+        # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False, rebalance_weights=class_weights_tensor)
+    else:
+        ce_loss = torch.nn.CrossEntropyLoss()
+        # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
 
     # switch to train mode
     model.train()
@@ -329,10 +350,34 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
         scheduler.step(loss)
 
 
-def validate(val_loader, model, epoch, args, writer):
+
+def load_class_weights(weight_path, num_classes, device):
+    if weight_path and os.path.isfile(weight_path):
+        with open(weight_path, "r") as f:
+            # Assumes your JSON file is a dictionary with keys "0", "1", ..., "num_classes-1"
+            weights_dict = json.load(f)
+        # Build list in order of class indices (convert keys to int if necessary)
+        weights = [float(weights_dict.get(str(i), 1.0)) for i in range(num_classes)]
+        weight_tensor = torch.tensor(weights, device=device)
+        print("Loaded class weights:", weight_tensor)
+    else:
+        print("No valid class weight file provided; using default (None)")
+        weight_tensor = None
+    return weight_tensor
+
+
+
+def validate(val_loader, model, epoch, args, writer, rebalance_weights=None):
     loss_list = []
     dice_list = []
     dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
+
+    # if rebalance_weights is not None:
+    #     dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False, rebalance_weights=rebalance_weights)
+    # else:
+    #     dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
+
+
     model.eval()
 
     with torch.no_grad():
