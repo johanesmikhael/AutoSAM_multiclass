@@ -106,6 +106,7 @@ parser.add_argument('--calc_weight_from_data', action='store_true', default=Fals
                     help="If enabled, calculate class weights directly from the training data and override class_weights")
 parser.add_argument("--ce_weight", type=float, default=1.0)
 parser.add_argument("--dice_weight", type=float, default=1.0)
+parser.add_argument('--cap_class_weight', action='store_true', default=False)
 
 
 def main():
@@ -251,6 +252,10 @@ def main_worker(gpu, ngpus_per_node, args):
         class_weights_tensor = compute_class_weights_from_data(train_loader, args.num_classes, device)
     else:
         class_weights_tensor = load_class_weights(args.class_weights, args.num_classes, device)
+
+    
+    if class_weights_tensor is not None and args.cap_class_weight:
+        class_weights_tensor = torch.clamp(class_weights_tensor, max=5.0)
 
 
     now = datetime.now()
