@@ -87,6 +87,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 parser.add_argument('--model_type', type=str, default="vit_l", help='path to splits file')
 parser.add_argument('--src_dir', type=str, default=None, help='path to splits file')
 parser.add_argument('--data_dir', type=str, default=None, help='path to datafolder')
+parser.add_argument('--out_dir', type=str, default="output_experiment", help='path to output folder')
 parser.add_argument("--img_size", type=int, default=256)
 parser.add_argument("--classes", type=int, default=8)
 parser.add_argument("--do_contrast", default=False, action='store_true')
@@ -260,7 +261,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     now = datetime.now()
     # args.save_dir = "output_experiment/Sam_h_seg_distributed_tr" + str(args.tr_size) # + str(now)[:-7]
-    args.save_dir = "output_experiment/" + args.save_dir
+    args.save_dir = os.path.join(args.out_dir, args.save_dir)
     print(args.save_dir)
     writer = SummaryWriter(os.path.join(args.save_dir, 'tensorboard' + str(gpu)))
 
