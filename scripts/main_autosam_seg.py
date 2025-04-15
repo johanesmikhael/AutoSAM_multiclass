@@ -104,6 +104,8 @@ parser.add_argument('--class_weights', type=str, default='',
                     help="Path to the JSON file that contains the class weights")
 parser.add_argument('--calc_weight_from_data', action='store_true', default=False,
                     help="If enabled, calculate class weights directly from the training data and override class_weights")
+parser.add_argument("--ce_weight", type=float, default=1.0)
+parser.add_argument("--dice_weight", type=float, default=1.0)
 
 
 def main():
@@ -334,11 +336,17 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer, class_
         iou_pred = iou_pred.squeeze().view(b, -1)
 
         pred_softmax = F.softmax(mask, dim=1)
-        loss = ce_loss(mask, label.squeeze(1)) + dice_loss(pred_softmax, label.squeeze(1))
+        # loss = ce_loss(mask, label.squeeze(1)) + dice_loss(pred_softmax, label.squeeze(1))
                # + dice_loss(pred_softmax, label.squeeze(1))
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
+
+        ce_loss_value = ce_loss(mask, label.squeeze(1))
+        dice_loss_value = dice_loss(pred_softmax, label.squeeze(1))
+
+        # Integrate new parameters by weighting the losses
+        loss = args.ce_weight * ce_loss_value + args.dice_weight * dice_loss_value
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
