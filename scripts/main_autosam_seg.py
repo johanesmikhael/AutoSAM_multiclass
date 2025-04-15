@@ -102,6 +102,8 @@ parser.add_argument("--load_pseudo_label", default=False, action='store_true')
 parser.add_argument("--dataset", type=str, default="synapse")
 parser.add_argument('--class_weights', type=str, default='', 
                     help="Path to the JSON file that contains the class weights")
+parser.add_argument('--calc_weight_from_data', action='store_true', default=False,
+                    help="If enabled, calculate class weights directly from the training data and override class_weights")
 
 
 def main():
@@ -200,13 +202,6 @@ def main_worker(gpu, ngpus_per_node, args):
         raise NotImplementedError("Only DistributedDataParallel is supported.")
     
 
-    if args.gpu is not None:
-        device = torch.device("cuda", args.gpu)
-    else:
-        device = torch.device("cpu")
-
-    # Load class weights if provided
-    class_weights_tensor = load_class_weights(args.class_weights, args.num_classes, device)
 
     # freeze weights in the image_encoder
     for name, param in model.named_parameters():
@@ -242,6 +237,19 @@ def main_worker(gpu, ngpus_per_node, args):
     # Data loading code
 
     train_loader, train_sampler, val_loader, val_sampler, test_loader, test_sampler = generate_dataset(args)
+
+    if args.gpu is not None:
+        device = torch.device("cuda", args.gpu)
+    else:
+        device = torch.device("cpu")
+
+    # Choose between loading weights from file or computing them from the training data
+    if args.calc_weight_from_data:
+        print("Calculating class weights from training data...")
+        class_weights_tensor = compute_class_weights_from_data(train_loader, args.num_classes, device)
+    else:
+        class_weights_tensor = load_class_weights(args.class_weights, args.num_classes, device)
+
 
     now = datetime.now()
     # args.save_dir = "output_experiment/Sam_h_seg_distributed_tr" + str(args.tr_size) # + str(now)[:-7]
@@ -365,6 +373,60 @@ def load_class_weights(weight_path, num_classes, device):
         weight_tensor = None
     return weight_tensor
 
+
+def compute_class_weights_from_data(train_loader, num_classes, device):
+    """
+    Compute class weights using median frequency balancing from the training data loader.
+    It handles empty labels by assigning a weight of 0.0 to classes not present in the data.
+
+    Args:
+        train_loader (DataLoader): PyTorch DataLoader that provides training samples as (image, label).
+        num_classes (int): Number of classes.
+        device (torch.device): Device for constructing the weight tensor.
+
+    Returns:
+        torch.Tensor: A tensor of class weights with shape [num_classes].
+    """
+    # Initialize an array to store the pixel counts for each class.
+    class_counts = np.zeros(num_classes, dtype=np.float64)
+    total_pixels = 0
+
+    # Iterate over the training loader
+    for i, data in enumerate(train_loader):
+        # Assuming data is a tuple (image, label)
+        _, label = data
+        # Ensure label is on CPU and convert to a numpy array.
+        labels_np = label.cpu().numpy()
+        # Count pixels for each class
+        for cls in range(num_classes):
+            class_counts[cls] += np.sum(labels_np == cls)
+        total_pixels += np.prod(labels_np.shape)
+
+    # Calculate the frequency of each class (proportion of pixels).
+    frequencies = class_counts / total_pixels if total_pixels > 0 else np.zeros_like(class_counts)
+
+    # Get frequencies only for classes that are present.
+    nonzero_frequencies = frequencies[frequencies > 0]
+    if len(nonzero_frequencies) == 0:
+        print("No class pixels found in the dataset.")
+        # Return a tensor with all zeros.
+        weight_tensor = torch.zeros(num_classes, dtype=torch.float32, device=device)
+        return weight_tensor
+
+    median_freq = np.median(nonzero_frequencies)
+
+    # Compute weight for each class.
+    weights = np.zeros(num_classes, dtype=np.float32)
+    for i in range(num_classes):
+        if frequencies[i] > 0:
+            weights[i] = median_freq / frequencies[i]
+        else:
+            # If a class does not exist in the dataset, set its weight to 0.0.
+            weights[i] = 0.0
+
+    weight_tensor = torch.tensor(weights, dtype=torch.float32, device=device)
+    print("Calculated class weights from data:", weight_tensor)
+    return weight_tensor
 
 
 def validate(val_loader, model, epoch, args, writer, rebalance_weights=None):
