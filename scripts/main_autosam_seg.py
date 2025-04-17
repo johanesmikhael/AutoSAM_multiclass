@@ -32,6 +32,7 @@ import json
 
 
 from loss_functions.dice_loss import SoftDiceLoss
+from loss_functions.focal_loss import FocalLoss
 from loss_functions.metrics import dice_pytorch, SegmentationMetric
 
 from models import sam_seg_model_registry
@@ -105,9 +106,10 @@ parser.add_argument('--class_weights', type=str, default='',
                     help="Path to the JSON file that contains the class weights")
 parser.add_argument('--calc_weight_from_data', action='store_true', default=False,
                     help="If enabled, calculate class weights directly from the training data and override class_weights")
-parser.add_argument("--ce_weight", type=float, default=1.0)
+parser.add_argument("--px_loss_weight", type=float, default=1.0)
 parser.add_argument("--dice_weight", type=float, default=1.0)
 parser.add_argument('--cap_class_weight', action='store_true', default=False)
+parser.add_argument('--px_loss', type=str, default='ce',) # Options: 'ce', 'focal'
 
 
 def main():
@@ -312,12 +314,21 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer, class_
     # ce_loss = torch.nn.CrossEntropyLoss()
 
 
-    if class_weights_tensor is not None:
-        ce_loss = torch.nn.CrossEntropyLoss(weight=class_weights_tensor)
-        # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False, rebalance_weights=class_weights_tensor)
+    # if class_weights_tensor is not None:
+    #     ce_loss = torch.nn.CrossEntropyLoss(weight=class_weights_tensor)
+    #     # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False, rebalance_weights=class_weights_tensor)
+    # else:
+    #     ce_loss = torch.nn.CrossEntropyLoss()
+    #     # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
+
+
+    if args.px_loss == 'focal':
+        px_loss = FocalLoss(
+            gamma=2.0,
+            weight=class_weights_tensor
+        )
     else:
-        ce_loss = torch.nn.CrossEntropyLoss()
-        # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
+        px_loss = torch.nn.CrossEntropyLoss(weight=class_weights_tensor)  # or args.ignore_index)
 
     # switch to train mode
     model.train()
@@ -348,11 +359,11 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer, class_
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
 
-        ce_loss_value = ce_loss(mask, label.squeeze(1))
+        px_loss_value = px_loss(mask, label.squeeze(1))
         dice_loss_value = dice_loss(pred_softmax, label.squeeze(1))
 
         # Integrate new parameters by weighting the losses
-        loss = args.ce_weight * ce_loss_value + args.dice_weight * dice_loss_value
+        loss = args.px_loss_weight * px_loss_value + args.dice_weight * dice_loss_value
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
