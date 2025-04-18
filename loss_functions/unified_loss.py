@@ -37,7 +37,9 @@ def symmetric_unified_focal_multiclass(delta: float = 0.6,
         ce = -y_true * torch.log(y_pred)                # (N, C, ...)
         mod = (1 - y_pred).pow(1 - gamma)              # (N, C, ...)
         mF = delta * mod * ce                          # (N, C, ...)
-        mF = mF.sum(dim=1).sum(dim=axes).mean()        # scalar
+        mF = mF.sum(dim=axes)       # (N, C)
+        mF = mF.sum(dim=1)          # (N,)
+        mF = mF.mean() 
         
         # 2) Modified focal Tversky component
         tp = torch.sum(y_true * y_pred, dim=axes)      # (N, C)
