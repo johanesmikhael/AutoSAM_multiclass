@@ -418,7 +418,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
 
 
 
-def compute_rare_classes_percentile(train_loader, num_classes, percentile=25):
+def compute_rare_classes_percentile(train_loader, num_classes, percentile=50):
     """
     Identify 'rare' classes as those whose pixel‐frequency falls below
     the given percentile of the class‐frequency distribution.
@@ -446,6 +446,7 @@ def compute_rare_classes_percentile(train_loader, num_classes, percentile=25):
 
     # 2) Compute frequencies
     freqs = class_counts / total_pixels  # shape (C,)
+    print(freqs)
 
     # 3) Find the cutoff at the given percentile
     cut = np.percentile(freqs, percentile)
