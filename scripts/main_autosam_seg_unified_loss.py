@@ -36,8 +36,8 @@ from loss_functions.dice_loss import SoftDiceLoss
 from loss_functions.metrics import dice_pytorch, SegmentationMetric
 
 from loss_functions.unified_loss import (
-     sym_unified_focal_loss,
-     asym_unified_focal_loss)
+    symmetric_unified_focal_multiclass,
+    asymmetric_unified_focal_multiclass)
 
 from models import sam_seg_model_registry
 from dataset import generate_dataset, generate_test_loader
@@ -332,21 +332,24 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
     #     px_loss = torch.nn.CrossEntropyLoss(weight=class_weights_tensor)  # or args.ignore_index)
 
 
-    # choose and instantiate exactly one unified focal loss
+    # choose and instantiate the multiclass unified focal loss
     if args.loss_type == 'sym':
-        criterion = sym_unified_focal_loss(
-            weight=args.uf_weight,
+        criterion = symmetric_unified_focal_multiclass(
             delta=args.uf_delta,
-            gamma=args.uf_gamma
+            gamma=args.uf_gamma,
+            weight=args.uf_weight
         )
-    elif args.loss_type == 'asym':
-            criterion = asym_unified_focal_loss(
-            weight=args.uf_weight,
-            delta=args.uf_delta,
-            gamma=args.uf_gamma
-        )
+        rare_classes = None
     else:
-        raise ValueError(f"Unknown loss type: {args.loss_type}")
+        rare_classes, freqs = compute_rare_classes_percentile(train_loader, args.num_classes)
+        for (i, c) in enumerate(rare_classes):
+            print(f"Rare class {i}: {c} with frequency {freqs[c]}")
+        criterion = asymmetric_unified_focal_multiclass(
+            rare_classes=rare_classes,
+            delta=args.uf_delta,
+            gamma=args.uf_gamma,
+            weight=args.uf_weight
+        )
     
 
     # switch to train mode
@@ -411,6 +414,47 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
 
     if epoch >= 10:
         scheduler.step(loss)
+
+
+
+
+def compute_rare_classes_percentile(train_loader, num_classes, percentile=25):
+    """
+    Identify 'rare' classes as those whose pixel‐frequency falls below
+    the given percentile of the class‐frequency distribution.
+
+    Args:
+        train_loader (DataLoader): yields tuples (image, label) with
+                                  label shape (N,1,H,W) or (N,H,W).
+        num_classes (int): total number of classes C.
+        percentile (float): e.g. 25 for the 25th percentile.
+
+    Returns:
+        rare_classes (List[int]): class indices with freq < percentile cut.
+        freqs       (np.ndarray): array of length C with class frequencies.
+    """
+    # 1) Accumulate pixel counts
+    class_counts = np.zeros(num_classes, dtype=np.int64)
+    total_pixels = 0
+
+    for _, labels in train_loader:
+        lbl = labels.squeeze(1).cpu().numpy()  # (N,H,W)
+        flat = lbl.reshape(-1)
+        hist = np.bincount(flat, minlength=num_classes)
+        class_counts += hist
+        total_pixels += flat.size
+
+    # 2) Compute frequencies
+    freqs = class_counts / total_pixels  # shape (C,)
+
+    # 3) Find the cutoff at the given percentile
+    cut = np.percentile(freqs, percentile)
+
+    # 4) All classes with freq < cut are "rare"
+    rare_classes = [int(c) for c, f in enumerate(freqs) if f < cut]
+
+    return rare_classes, freqs
+
 
 
 
