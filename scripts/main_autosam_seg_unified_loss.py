@@ -250,22 +250,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     train_loader, train_sampler, val_loader, val_sampler, test_loader, test_sampler = generate_dataset(args)
 
-    if args.gpu is not None:
-        device = torch.device("cuda", args.gpu)
-    else:
-        device = torch.device("cpu")
-
-    # Choose between loading weights from file or computing them from the training data
-    if args.calc_weight_from_data:
-        print("Calculating class weights from training data...")
-        class_weights_tensor = compute_class_weights_from_data(train_loader, args.num_classes, device)
-    else:
-        class_weights_tensor = load_class_weights(args.class_weights, args.num_classes, device)
-
-    
-    if class_weights_tensor is not None and args.cap_class_weight:
-        class_weights_tensor = torch.clamp(class_weights_tensor, max=5.0)
-
+ 
 
     now = datetime.now()
     # args.save_dir = "output_experiment/Sam_h_seg_distributed_tr" + str(args.tr_size) # + str(now)[:-7]
@@ -285,8 +270,8 @@ def main_worker(gpu, ngpus_per_node, args):
         writer.add_scalar("lr", optimizer.param_groups[0]["lr"], global_step=epoch)
 
         # train for one epoch
-        train(train_loader, model, optimizer, scheduler, epoch, args, writer, class_weights_tensor)
-        loss = validate(val_loader, model, epoch, args, writer, class_weights_tensor)
+        train(train_loader, model, optimizer, scheduler, epoch, args, writer)
+        loss = validate(val_loader, model, epoch, args, writer)
 
         if loss < best_loss:
             is_best = True
@@ -322,7 +307,7 @@ def main_worker(gpu, ngpus_per_node, args):
         test_material(args)
 
 
-def train(train_loader, model, optimizer, scheduler, epoch, args, writer, class_weights_tensor):
+def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
     # batch_time = AverageMeter('Time', ':6.3f')
     # data_time = AverageMeter('Data', ':6.3f')
     # losses = AverageMeter('Loss', ':.4e')
@@ -499,7 +484,7 @@ def compute_class_weights_from_data(train_loader, num_classes, device):
     return weight_tensor
 
 
-def validate(val_loader, model, epoch, args, writer, rebalance_weights=None):
+def validate(val_loader, model, epoch, args, writer):
     loss_list = []
     dice_list = []
     dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
