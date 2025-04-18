@@ -449,6 +449,7 @@ def compute_rare_classes_percentile(train_loader, num_classes, percentile=25):
 
     # 3) Find the cutoff at the given percentile
     cut = np.percentile(freqs, percentile)
+    print(f"Percentile {percentile} cut: {cut:.4f}")
 
     # 4) All classes with freq < cut are "rare"
     rare_classes = [int(c) for c, f in enumerate(freqs) if 0 < f < cut]
