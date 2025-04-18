@@ -394,6 +394,9 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
             .float()
         )
 
+        print(pred_softmax.shape)
+        print(y_onehot.shape)
+
         loss = criterion(pred_softmax, y_onehot)
 
 
