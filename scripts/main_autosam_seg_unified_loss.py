@@ -438,7 +438,7 @@ def compute_rare_classes_percentile(train_loader, num_classes, percentile=25):
     total_pixels = 0
 
     for _, labels in train_loader:
-        lbl = labels.squeeze(1).cpu().numpy()  # (N,H,W)
+        lbl = labels.squeeze(1).cpu().numpy().astype(np.int64)  # (N,H,W)
         flat = lbl.reshape(-1)
         hist = np.bincount(flat, minlength=num_classes)
         class_counts += hist
