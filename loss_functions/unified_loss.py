@@ -37,8 +37,8 @@ def symmetric_unified_focal_multiclass(delta: float = 0.6,
         ce = -y_true * torch.log(y_pred)                # (N, C, ...)
         mod = (1 - y_pred).pow(1 - gamma)              # (N, C, ...)
         mF = delta * mod * ce                          # (N, C, ...)
-        mF = mF.sum(dim=axes)       # (N, C)
-        mF = mF.sum(dim=1)          # (N,)
+        mF = mF.mean(dim=axes)       # (N, C)
+        mF = mF.mean(dim=1)          # (N,)
         mF = mF.mean() 
         
         # 2) Modified focal Tversky component
@@ -47,7 +47,7 @@ def symmetric_unified_focal_multiclass(delta: float = 0.6,
         fp = torch.sum((1 - y_true) * y_pred, dim=axes)
         mTI = (tp + eps) / (tp + delta * fn + (1 - delta) * fp + eps)
         mFT = (1 - mTI).pow(gamma)                     # (N, C)
-        mFT = mFT.sum(dim=1).mean()                    # scalar
+        mFT = mFT.mean(dim=1).mean()                    # scalar
         
         return weight * mF + (1 - weight) * mFT
     
@@ -89,7 +89,9 @@ def asymmetric_unified_focal_multiclass(rare_classes,
         wts  = wts.view(shape)
         
         mF = wts * (1 - y_pred).pow(exps) * ce         # (N, C, ...)
-        mF = mF.sum(dim=1).sum(dim=axes).mean()        # scalar
+        mF = mF.mean(dim=axes)       # (N, C)
+        mF = mF.mean(dim=1)          # (N,)
+        mF = mF.mean()         # scalar
         
         # 2) Modified asymmetric focal Tversky component
         tp = torch.sum(y_true * y_pred, dim=axes)      # (N, C)
@@ -102,7 +104,7 @@ def asymmetric_unified_focal_multiclass(rare_classes,
             exp_mask[:, cls] = 1 - gamma
         
         mFT = (1 - mTI).pow(exp_mask)                 # (N, C)
-        mFT = mFT.sum(dim=1).mean()                   # scalar
+        mFT = mFT.mean(dim=1).mean()                   # scalar
         
         return weight * mF + (1 - weight) * mFT
     
