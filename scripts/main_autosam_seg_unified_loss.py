@@ -536,7 +536,7 @@ def validate(val_loader, model, epoch, args, writer):
     loss_list = []
     dice_list = []
     # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
-    dice_score_fn = DiceScoreCoefficient(num_classes=args.num_classes, ignore_index=0)
+    dice_score_fn = DiceScoreCoefficient(n_classes=args.num_classes, ignore_index=0)
 
     # if rebalance_weights is not None:
     #     dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False, rebalance_weights=rebalance_weights)

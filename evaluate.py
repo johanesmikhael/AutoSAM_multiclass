@@ -415,17 +415,14 @@ def test_material(args):
                 gt_mask = (gt == label_val).astype(np.uint8)
                 pred_mask = (pred == label_val).astype(np.uint8)
                 # Only calculate Dice score if there is something to segment in the ground truth.
-                if gt_mask.sum() > 0:
-                    score = dice(pred_mask, gt_mask)
-                    dice_scores[label_val].append(score)
-                    fw_dice.write(f"Dice_{label_name}: {score:.4f}\n")
-                    iou_score = iou(pred_mask, gt_mask)
-                    iou_scores[label_val].append(iou_score)
-                    fw_iou.write(f"IoU_{label_name}: {iou_score:.4f}\n")
-                else:
-                    fw_dice.write(f"Dice_{label_name}: skipped (empty ground truth)\n")
-                    fw_iou.write(f"IoU_{label_name}: skipped (empty ground truth)\n")
+                # your dice() returns 1 if both empty, 0 if GT empty but pred non-empty
+                d = dice(pred_mask, gt_mask)
+                dice_scores[label_val].append(d)
+                fw_dice.write(f"Dice_{label_name}: {d:.4f}\n")
 
+                i = iou(pred_mask, gt_mask)
+                iou_scores[label_val].append(i)
+                fw_iou.write(f"IoU_{label_name}: {i:.4f}\n")
                 # score = dice(pred_mask, gt_mask)
                 # dice_scores[label_val].append(score)
                 # fw.write(f"Dice_{label_name}: {score:.4f}\n")

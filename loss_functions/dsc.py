@@ -57,11 +57,17 @@ class DiceScoreCoefficient(nn.Module):
         recall    = tp / (fn + self.eps)
         dsc = 2 * precision * recall / (precision + recall + self.eps)
 
-        # classes with no true or predicted pixels -> skip (NaN)
-        absent = (tp == 0) & (fp == 0) & (fn == 0)
-        # also skip the ignored class
-        absent[self.ignore_index] = True
-        dsc[absent] = float('nan')
+        # classes with no ground‐truth pixels
+        gt_empty = (tp + fn) == 0
+        # among those, did we also predict none?
+        pred_empty = (tp + fp) == 0
+
+        # assign 1 or 0 to those cases
+        dsc[gt_empty & pred_empty] = 1.0
+        dsc[gt_empty & ~pred_empty] = 0.0
+
+        # still skip the ignore_index entirely
+        dsc[self.ignore_index] = float('nan')
 
         return dsc
 
