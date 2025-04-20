@@ -274,7 +274,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, optimizer, scheduler, epoch, args, writer)
         val_dice = validate(val_loader, model, epoch, args, writer)
 
-        if val_dice < best_dice:
+        if val_dice > best_dice:
             is_best = True
             best_dice = val_dice
 
@@ -535,8 +535,9 @@ def compute_class_weights_from_data(train_loader, num_classes, device):
 def validate(val_loader, model, epoch, args, writer):
     loss_list = []
     dice_list = []
+    iou_preds = []
     # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
-    dice_score_fn = DiceScoreCoefficient(n_classes=args.num_classes, ignore_index=0)
+    dice_score_fn = DiceScoreCoefficient(n_classes=args.num_classes, ignore_index=0).to(model.device)
 
     # if rebalance_weights is not None:
     #     dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False, rebalance_weights=rebalance_weights)
@@ -563,7 +564,7 @@ def validate(val_loader, model, epoch, args, writer):
             mask = mask.view(b, -1, h, w)
             iou_pred = iou_pred.squeeze().view(b, -1)
             iou_pred = torch.mean(iou_pred)
-
+            iou_preds.append(iou_pred.item())
             pred_softmax = F.softmax(mask, dim=1)
             dice_score_fn.reset() 
             batch_dsc = dice_score_fn(pred_softmax, label.squeeze(1))  # self.ce_loss(pred, target.squeeze())
@@ -571,7 +572,7 @@ def validate(val_loader, model, epoch, args, writer):
             dice_list.append(batch_macro)
 
     dice_score_mean = np.mean(dice_list)
-    print('Validating: Epoch: %2d DSC: %.4f IoU_pred: %.4f' % (epoch, dice_score_mean, iou_pred.item()))
+    print('Validating: Epoch: %2d DSC: %.4f IoU_pred: %.4f' % (epoch, dice_score_mean, np.mean(iou_preds)))
     writer.add_scalar("val_dsc", dice_score_mean, epoch)
     return dice_score_mean
 
