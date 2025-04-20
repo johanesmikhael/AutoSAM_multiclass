@@ -537,7 +537,10 @@ def validate(val_loader, model, epoch, args, writer):
     dice_list = []
     iou_preds = []
     # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
-    dice_score_fn = DiceScoreCoefficient(n_classes=args.num_classes, ignore_index=0).to(model.device)
+    dice_score_fn = DiceScoreCoefficient(n_classes=args.num_classes, ignore_index=0)
+
+    if args.gpu is not None:
+        dice_score_fn = dice_score_fn.cuda(args.gpu)
 
     # if rebalance_weights is not None:
     #     dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False, rebalance_weights=rebalance_weights)
