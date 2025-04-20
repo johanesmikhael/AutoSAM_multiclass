@@ -565,8 +565,10 @@ def validate(val_loader, model, epoch, args, writer):
             iou_pred = torch.mean(iou_pred)
 
             pred_softmax = F.softmax(mask, dim=1)
-            dice_score = dice_score_fn(pred_softmax, label.squeeze(1))  # self.ce_loss(pred, target.squeeze())
-            dice_list.append(dice_score.item())
+            dice_score_fn.reset() 
+            batch_dsc = dice_score_fn(pred_softmax, label.squeeze(1))  # self.ce_loss(pred, target.squeeze())
+            batch_macro = torch.nanmean(batch_dsc).item()
+            dice_list.append(batch_macro)
 
     dice_score_mean = np.mean(dice_list)
     print('Validating: Epoch: %2d DSC: %.4f IoU_pred: %.4f' % (epoch, dice_score_mean, iou_pred.item()))
