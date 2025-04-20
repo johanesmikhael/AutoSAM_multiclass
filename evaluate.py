@@ -390,7 +390,7 @@ def test_material(args):
     dice_file = os.path.join(args.save_dir, 'dice_pre.txt')
     iou_file = os.path.join(args.save_dir, 'iou_pre.txt')
 
-    with open(dice_file, 'a') as fw_dice, open(iou_file, 'a') as fw_iou:
+    with open(dice_file, 'w') as fw_dice, open(iou_file, 'w') as fw_iou:
         for label_path, infer_path in zip(label_list, infer_list):
             filename = os.path.basename(infer_path)
             print(filename)
@@ -433,35 +433,54 @@ def test_material(args):
             fw_iou.write('*' * 20 + '\n')
 
 
-        # Write mean Dice scores per label.
+        # Write mean Dice per class, skipping absent ones
         fw_dice.write('*' * 20 + '\n')
         fw_dice.write("Mean_Dice\n")
-        overall_scores = []
+
+        # build a dict of per‐class means, using NaN for skipped classes
+        per_class_mean = {}
         for label_val, label_name in label_names.items():
-            if dice_scores[label_val]:
-                mean_score = np.mean(dice_scores[label_val])
-                overall_scores.extend(dice_scores[label_val])
+            scores = dice_scores[label_val]
+            if scores:
+                per_class_mean[label_val] = np.mean(scores)
             else:
-                mean_score = 0.0
-            fw_dice.write(f"Dice_{label_name}: {mean_score:.4f}\n")
-        overall_mean = np.mean(overall_scores) if overall_scores else 0.0
+                per_class_mean[label_val] = np.nan
+
+            m = per_class_mean[label_val]
+            if np.isnan(m):
+                fw_dice.write(f"Dice_{label_name}: skipped (no GT)\n")
+            else:
+                fw_dice.write(f"Dice_{label_name}: {m:.4f}\n")
+
+        # compute the macro‐Dice by ignoring NaNs
+        macro_dice = np.nanmean(list(per_class_mean.values()))
         fw_dice.write('*' * 20 + '\n')
-        fw_dice.write(f"DSC: {overall_mean:.4f}\n")
+        fw_dice.write(f"Macro_Dice (skipping absent): {macro_dice:.4f}\n")
         fw_dice.write('*' * 20 + '\n')
 
+        # Write mean IoU per class, skipping absent ones
         fw_iou.write('*' * 20 + '\n')
         fw_iou.write("Mean_IoU\n")
-        overall_iou_scores = []
+
+        # build a dict of per‐class means, using NaN for skipped classes
+        per_class_iou = {}
         for label_val, label_name in label_names.items():
-            if iou_scores[label_val]:
-                mean_iou = np.mean(iou_scores[label_val])
-                overall_iou_scores.extend(iou_scores[label_val])
+            scores = iou_scores[label_val]
+            if scores:
+                per_class_iou[label_val] = np.mean(scores)
             else:
-                mean_iou = 0.0
-            fw_iou.write(f"IoU_{label_name}: {mean_iou:.4f}\n")
-        overall_iou_mean = np.mean(overall_iou_scores) if overall_iou_scores else 0.0
+                per_class_iou[label_val] = np.nan
+
+            m = per_class_iou[label_val]
+            if np.isnan(m):
+                fw_iou.write(f"IoU_{label_name}: skipped (no GT)\n")
+            else:
+                fw_iou.write(f"IoU_{label_name}: {m:.4f}\n")
+
+        # compute the macro‐IoU by ignoring NaNs
+        macro_iou = np.nanmean(list(per_class_iou.values()))
         fw_iou.write('*' * 20 + '\n')
-        fw_iou.write(f"Mean IoU: {overall_iou_mean:.4f}\n")
+        fw_iou.write(f"Macro_IoU (skipping absent): {macro_iou:.4f}\n")
         fw_iou.write('*' * 20 + '\n')
 
     print("Dice Scores:")

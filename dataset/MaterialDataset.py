@@ -86,7 +86,7 @@ class MaterialDataset(Dataset):
                                  do_elastic_deform=True, alpha=(100., 350.), sigma=(40., 60.),
                                  do_rotation=True, p_rot_per_sample=0.5,
                                  angle_x=(-0.1, 0.1), angle_y=(0, 1e-8), angle_z=(0, 1e-8),
-                                 scale=(0.5, 1.9), p_scale_per_sample=0.5,
+                                 scale=(0.9, 1.1), p_scale_per_sample=0.5, # the scale is smaller so that the drawing scale is kept consistent
                                  border_mode_data="nearest", border_mode_seg="nearest"),
                 NumpyToTensor(),
             ]

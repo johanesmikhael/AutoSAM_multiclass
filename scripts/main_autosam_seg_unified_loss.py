@@ -31,7 +31,8 @@ import json
 
 
 
-from loss_functions.dice_loss import SoftDiceLoss
+# from loss_functions.dice_loss import SoftDiceLoss
+from loss_functions.dsc import DiceScoreCoefficient
 # from loss_functions.focal_loss import FocalLoss
 from loss_functions.metrics import dice_pytorch, SegmentationMetric
 
@@ -259,7 +260,7 @@ def main_worker(gpu, ngpus_per_node, args):
     writer = SummaryWriter(os.path.join(args.save_dir, 'tensorboard' + str(gpu)))
 
     
-    best_loss = 100
+    best_dice = 0.0
 
     for epoch in range(args.start_epoch, args.epochs):
         is_best = False
@@ -271,11 +272,11 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # train for one epoch
         train(train_loader, model, optimizer, scheduler, epoch, args, writer)
-        loss = validate(val_loader, model, epoch, args, writer)
+        val_dice = validate(val_loader, model, epoch, args, writer)
 
-        if loss < best_loss:
+        if val_dice < best_dice:
             is_best = True
-            best_loss = loss
+            best_dice = val_dice
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -534,7 +535,8 @@ def compute_class_weights_from_data(train_loader, num_classes, device):
 def validate(val_loader, model, epoch, args, writer):
     loss_list = []
     dice_list = []
-    dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
+    # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
+    dice_score_fn = DiceScoreCoefficient(num_classes=args.num_classes, ignore_index=0)
 
     # if rebalance_weights is not None:
     #     dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False, rebalance_weights=rebalance_weights)
@@ -563,12 +565,13 @@ def validate(val_loader, model, epoch, args, writer):
             iou_pred = torch.mean(iou_pred)
 
             pred_softmax = F.softmax(mask, dim=1)
-            loss = dice_loss(pred_softmax, label.squeeze(1))  # self.ce_loss(pred, target.squeeze())
-            loss_list.append(loss.item())
+            dice_score = dice_score_fn(pred_softmax, label.squeeze(1))  # self.ce_loss(pred, target.squeeze())
+            dice_list.append(dice_score.item())
 
-    print('Validating: Epoch: %2d Loss: %.4f IoU_pred: %.4f' % (epoch, np.mean(loss_list), iou_pred.item()))
-    writer.add_scalar("val_loss", np.mean(loss_list), epoch)
-    return np.mean(loss_list)
+    dice_score_mean = np.mean(dice_list)
+    print('Validating: Epoch: %2d DSC: %.4f IoU_pred: %.4f' % (epoch, dice_score_mean, iou_pred.item()))
+    writer.add_scalar("val_dsc", dice_score_mean, epoch)
+    return dice_score_mean
 
 
 def test(model, args):
