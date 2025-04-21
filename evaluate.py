@@ -390,6 +390,9 @@ def test_material(args):
     dice_file = os.path.join(args.save_dir, 'dice_pre.txt')
     iou_file = os.path.join(args.save_dir, 'iou_pre.txt')
 
+    has_gt      = {label: False for label in label_names}   # track presence in GT
+
+
     with open(dice_file, 'w') as fw_dice, open(iou_file, 'w') as fw_iou:
         for label_path, infer_path in zip(label_list, infer_list):
             filename = os.path.basename(infer_path)
@@ -399,6 +402,10 @@ def test_material(args):
             # Read PNG images (assumed to be single-channel with integer label values)
             gt = np.array(Image.open(label_path))
             pred = np.array(Image.open(infer_path))
+
+            # record that this class did appear in GT at least once
+            if gt_mask.sum() > 0:
+                has_gt[label_val] = True
             
             fw_dice.write('*' * 20 + '\n')
             fw_dice.write(filename + '\n')
@@ -437,22 +444,22 @@ def test_material(args):
         # build a dict of per‐class means, using NaN for skipped classes
         per_class_mean = {}
         for label_val, label_name in label_names.items():
-            scores = dice_scores[label_val]
-            if scores:
-                per_class_mean[label_val] = np.mean(scores)
+            # scores = dice_scores[label_val]
+            if has_gt[label_val]:
+                per_class_mean[label_val] = np.mean(dice_scores[label_val])
             else:
                 per_class_mean[label_val] = np.nan
 
             m = per_class_mean[label_val]
             if np.isnan(m):
-                fw_dice.write(f"Dice_{label_name}: skipped (no GT)\n")
+                fw_dice.write(f"Dice_{label_name}: skipped (no GT in the dataset)\n")
             else:
                 fw_dice.write(f"Dice_{label_name}: {m:.4f}\n")
 
         # compute the macro‐Dice by ignoring NaNs
         macro_dice = np.nanmean(list(per_class_mean.values()))
         fw_dice.write('*' * 20 + '\n')
-        fw_dice.write(f"Macro_Dice (skipping absent): {macro_dice:.4f}\n")
+        fw_dice.write(f"Macro_Dice skip absent class: {macro_dice:.4f}\n")
         fw_dice.write('*' * 20 + '\n')
 
         # Write mean IoU per class, skipping absent ones
@@ -462,22 +469,22 @@ def test_material(args):
         # build a dict of per‐class means, using NaN for skipped classes
         per_class_iou = {}
         for label_val, label_name in label_names.items():
-            scores = iou_scores[label_val]
-            if scores:
-                per_class_iou[label_val] = np.mean(scores)
+            # scores = iou_scores[label_val]
+            if has_gt[label_val]:
+                per_class_iou[label_val] = np.mean(dice_scores[label_val])
             else:
                 per_class_iou[label_val] = np.nan
 
             m = per_class_iou[label_val]
             if np.isnan(m):
-                fw_iou.write(f"IoU_{label_name}: skipped (no GT)\n")
+                fw_iou.write(f"IoU_{label_name}: skipped (no GT in the dataset)\n")
             else:
                 fw_iou.write(f"IoU_{label_name}: {m:.4f}\n")
 
         # compute the macro‐IoU by ignoring NaNs
         macro_iou = np.nanmean(list(per_class_iou.values()))
         fw_iou.write('*' * 20 + '\n')
-        fw_iou.write(f"Macro_IoU (skipping absent): {macro_iou:.4f}\n")
+        fw_iou.write(f"Macro_IoU skip absent class: {macro_iou:.4f}\n")
         fw_iou.write('*' * 20 + '\n')
 
     print("Dice Scores:")
