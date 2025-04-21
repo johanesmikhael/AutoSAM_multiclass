@@ -403,9 +403,7 @@ def test_material(args):
             gt = np.array(Image.open(label_path))
             pred = np.array(Image.open(infer_path))
 
-            # record that this class did appear in GT at least once
-            if gt_mask.sum() > 0:
-                has_gt[label_val] = True
+            
             
             fw_dice.write('*' * 20 + '\n')
             fw_dice.write(filename + '\n')
@@ -421,6 +419,10 @@ def test_material(args):
             for label_val, label_name in label_names.items():
                 gt_mask = (gt == label_val).astype(np.uint8)
                 pred_mask = (pred == label_val).astype(np.uint8)
+
+                # record that this class did appear in GT at least once
+                if gt_mask.sum() > 0:
+                    has_gt[label_val] = True
                 # Only calculate Dice score if there is something to segment in the ground truth.
                 # your dice() returns 1 if both empty, 0 if GT empty but pred non-empty
                 d = dice(pred_mask, gt_mask)
