@@ -63,7 +63,7 @@ class DiceScoreCoefficient(nn.Module):
         pred_empty = (tp + fp) == 0
 
         # assign 1 or 0 to those cases
-        dsc[gt_empty & pred_empty] = 1.0
+        dsc[gt_empty & pred_empty] = float('nan')
         dsc[gt_empty & ~pred_empty] = 0.0
 
         # still skip the ignore_index entirely

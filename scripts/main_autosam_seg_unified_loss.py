@@ -287,16 +287,16 @@ def main_worker(gpu, ngpus_per_node, args):
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, filename=filename)
 
-        # —————— At the end of training, save a “final” checkpoint ——————
-        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                and args.rank % ngpus_per_node == 0):
-            if epoch == args.epochs - 1:
-                final_fname = os.path.join(args.save_dir, 'checkpoint_final_b%d.pth.tar' % args.batch_size)
-                save_checkpoint({
-                    'epoch': args.epochs,
-                    'state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                }, is_best=True, filename=final_fname)
+    # —————— At the end of training, save a “final” checkpoint ——————
+    if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+            and args.rank % ngpus_per_node == 0):
+
+        final_fname = os.path.join(args.save_dir, 'checkpoint_final_b%d.pth.tar' % args.batch_size)
+        save_checkpoint({
+            'epoch': args.epochs,
+            'state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
+            'optimizer': optimizer.state_dict(),
+        }, is_best=True, filename=final_fname)
 
     test(model, args)
     if args.dataset == 'synapse':
