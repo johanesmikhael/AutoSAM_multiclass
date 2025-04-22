@@ -15,7 +15,7 @@ def read_nii(path):
 
 def dice(pred, label):
     if (pred.sum() + label.sum()) == 0:
-        return 1
+        return np.nan
     else:
         return 2. * np.logical_and(pred, label).sum() / (pred.sum() + label.sum())
     
@@ -24,8 +24,8 @@ def iou(pred, label):
     intersection = np.logical_and(pred, label).sum()
     union = np.logical_or(pred, label).sum()
     if union == 0:
-        # If both the prediction and label are empty, return perfect score.
-        return 1
+        # If both the prediction and label are empty, return nan.
+        return np.nan
     else:
         return intersection / union
 
@@ -420,18 +420,21 @@ def test_material(args):
                 gt_mask = (gt == label_val).astype(np.uint8)
                 pred_mask = (pred == label_val).astype(np.uint8)
 
-                # record that this class did appear in GT at least once
-                if gt_mask.sum() > 0:
-                    has_gt[label_val] = True
                 # Only calculate Dice score if there is something to segment in the ground truth.
                 # your dice() returns 1 if both empty, 0 if GT empty but pred non-empty
                 d = dice(pred_mask, gt_mask)
                 dice_scores[label_val].append(d)
-                fw_dice.write(f"Dice_{label_name}: {d:.4f}\n")
+                if np.isnan(d):
+                    fw_dice.write(f"Dice_{label_name}: skipped (no GT & no pred)\n")
+                else:
+                    fw_dice.write(f"Dice_{label_name}: {d:.4f}\n")
 
                 i = iou(pred_mask, gt_mask)
                 iou_scores[label_val].append(i)
-                fw_iou.write(f"IoU_{label_name}: {i:.4f}\n")
+                if np.isnan(i):
+                    fw_iou.write(f"IoU_{label_name}: skipped (no GT & no pred)\n")
+                else:
+                    fw_iou.write(f"IoU_{label_name}: {i:.4f}\n")
                 # score = dice(pred_mask, gt_mask)
                 # dice_scores[label_val].append(score)
                 # fw.write(f"Dice_{label_name}: {score:.4f}\n")
@@ -446,17 +449,11 @@ def test_material(args):
         # build a dict of per‐class means, using NaN for skipped classes
         per_class_mean = {}
         for label_val, label_name in label_names.items():
-            # scores = dice_scores[label_val]
-            if has_gt[label_val]:
-                per_class_mean[label_val] = np.mean(dice_scores[label_val])
+            per_class_mean[label_val] = np.nanmean(dice_scores[label_val])
+            if np.isnan(per_class_mean[label_val]):
+                fw_dice.write(f"Dice_{label_name}: skipped (no GT in dataset)\n")
             else:
-                per_class_mean[label_val] = np.nan
-
-            m = per_class_mean[label_val]
-            if np.isnan(m):
-                fw_dice.write(f"Dice_{label_name}: skipped (no GT in the dataset)\n")
-            else:
-                fw_dice.write(f"Dice_{label_name}: {m:.4f}\n")
+                fw_dice.write(f"Dice_{label_name}: {per_class_mean[label_val]:.4f}\n")
 
         # compute the macro‐Dice by ignoring NaNs
         macro_dice = np.nanmean(list(per_class_mean.values()))
@@ -471,17 +468,12 @@ def test_material(args):
         # build a dict of per‐class means, using NaN for skipped classes
         per_class_iou = {}
         for label_val, label_name in label_names.items():
-            # scores = iou_scores[label_val]
-            if has_gt[label_val]:
-                per_class_iou[label_val] = np.mean(dice_scores[label_val])
+            per_class_iou[label_val] = np.nanmean(iou_scores[label_val])
+            if np.isnan(per_class_iou[label_val]):
+                fw_iou.write(f"IoU_{label_name}: skipped (no GT in dataset)\n")
             else:
-                per_class_iou[label_val] = np.nan
+                fw_iou.write(f"IoU_{label_name}: {per_class_iou[label_val]:.4f}\n")
 
-            m = per_class_iou[label_val]
-            if np.isnan(m):
-                fw_iou.write(f"IoU_{label_name}: skipped (no GT in the dataset)\n")
-            else:
-                fw_iou.write(f"IoU_{label_name}: {m:.4f}\n")
 
         # compute the macro‐IoU by ignoring NaNs
         macro_iou = np.nanmean(list(per_class_iou.values()))
