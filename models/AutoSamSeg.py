@@ -137,9 +137,9 @@ class AutoSamSegGabor(nn.Module):
                 padding=self.gabor_kernels.shape[-1]//2
             )  # (B,12,H',W')
             
-            # 4) image features
-            tex_patches = self.tex_proj(tex)       # (B,embed_dim,64,64)
-            tex_emb     = self.tex_neck(tex_patches)  # (B,out_chans,64,64)
+        # 4) image features
+        tex_patches = self.tex_proj(tex)       # (B,embed_dim,64,64)
+        tex_emb     = self.tex_neck(tex_patches)  # (B,out_chans,64,64)
 
         # 5) fuse
         fused = img_emb + tex_emb  # (B,D,H',W')
