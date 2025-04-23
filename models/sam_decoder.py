@@ -322,7 +322,7 @@ class MaskDecoder(nn.Module):
         tokens = output_tokens.repeat(image_embeddings.size(0), 1, 1)
 
         # Expand per-image data in batch direction to be per-mask
-        src = image_embeddings.expand(-1, output_tokens.shape[1], -1, -1, -1).flatten(0, 1)
+        src = image_embeddings.expand(-1, output_tokens.shape[0], -1, -1, -1).flatten(0, 1)
         pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
 
         b, c, h, w = src.shape
