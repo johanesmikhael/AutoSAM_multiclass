@@ -284,6 +284,7 @@ def main_worker(gpu, ngpus_per_node, args):
             save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
+                'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, filename=filename)
 
@@ -294,7 +295,8 @@ def main_worker(gpu, ngpus_per_node, args):
         final_fname = os.path.join(args.save_dir, 'checkpoint_final_b%d.pth.tar' % args.batch_size)
         save_checkpoint({
             'epoch': args.epochs,
-            'state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
+            'mask_decoder_state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
+            'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, is_best=True, filename=final_fname)
 

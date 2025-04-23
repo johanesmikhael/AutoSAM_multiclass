@@ -390,7 +390,7 @@ def test_material(args):
     dice_file = os.path.join(args.save_dir, 'dice_pre.txt')
     iou_file = os.path.join(args.save_dir, 'iou_pre.txt')
 
-    has_gt      = {label: False for label in label_names}   # track presence in GT
+    # has_gt      = {label: False for label in label_names}   # track presence in GT
 
 
     with open(dice_file, 'w') as fw_dice, open(iou_file, 'w') as fw_iou:

@@ -55,21 +55,23 @@ def evaluate_model(args):
     model = sam_seg_model_registry[args.model_type](num_classes=args.num_classes,
                                                     checkpoint=base_checkpoint)
     
-    # Load the saved checkpoint (for the mask_decoder).
+    # Load the saved checkpoint (decoder + pe_layer).
     if os.path.isfile(args.checkpoint):
-        if args.gpu is None:
-            checkpoint = torch.load(args.checkpoint, map_location=torch.device('cpu'))
-        else:
-            loc = 'cuda:{}'.format(args.gpu)
-            checkpoint = torch.load(args.checkpoint, map_location=loc)
-        # The checkpoint stores the mask_decoder's state_dict.
-        if hasattr(model, 'module'):
-            model.module.mask_decoder.load_state_dict(checkpoint['state_dict'])
-        else:
-            model.mask_decoder.load_state_dict(checkpoint['state_dict'])
-        print("=> Loaded checkpoint '{}' (epoch {})".format(args.checkpoint, checkpoint['epoch']))
+        # map to the right device
+        map_loc = torch.device('cpu') if args.gpu is None else torch.device(f'cuda:{args.gpu}')
+        checkpoint = torch.load(args.checkpoint, map_location=map_loc)
+
+        # grab sub-modules
+        dec = model.module.mask_decoder if hasattr(model, 'module') else model.mask_decoder
+        pe  = model.module.pe_layer     if hasattr(model, 'module') else model.pe_layer
+
+        # load state_dicts
+        dec.load_state_dict(checkpoint['mask_decoder_state_dict'])
+        pe.load_state_dict( checkpoint['pe_layer_state_dict']    )
+
+        print(f"=> Loaded checkpoint '{args.checkpoint}' (epoch {checkpoint['epoch']})")
     else:
-        print("=> No checkpoint found at '{}'".format(args.checkpoint))
+        print(f"=> No checkpoint found at '{args.checkpoint}'")
         return
 
     # If GPU is specified, move the model to GPU.
