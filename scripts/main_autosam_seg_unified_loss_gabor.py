@@ -225,7 +225,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # param.requires_grad = True
 
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-    scheduler = ReduceLROnPlateau(optimizer, 'min')
+    scheduler = ReduceLROnPlateau(optimizer, 'max')
 
     # optionally resume from a checkpoint
     if args.resume:
