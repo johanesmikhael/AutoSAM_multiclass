@@ -133,12 +133,12 @@ class MaskDecoder2(nn.Module):
         # expand image embeddings per mask
 
         # Expand per-image data in batch direction to be per-mask
-        src = image_embeddings.expand(-1, output_tokens.shape[1], -1, -1, -1).flatten(0, 1)
-        pos_src = torch.repeat_interleave(image_pe, tokens.shape[1], dim=0)
+        src = image_embeddings.expand(-1, output_tokens.shape[0], -1, -1, -1).flatten(0, 1)
+        pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
 
 
         # Expand per-image data in batch direction to be per-mask
-        src = image_embeddings.expand(-1, tokens.shape[1], -1, -1, -1)
+        src = image_embeddings.expand(-1, tokens.shape[0], -1, -1, -1)
         Bm, M, D, Hf, Wf = src.shape
         src = src.flatten(0, 1)  # (B*M, D, H', W')
 

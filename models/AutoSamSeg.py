@@ -164,13 +164,6 @@ class AutoSamSegGabor2(nn.Module):
         )  # → (12,1,31,31)
         self.register_buffer('gabor_kernels', gabor_bank)
 
-        # project 12 → out_chans *and* downsample from 256→64 in one go
-        out_ch = self.image_encoder.neck[0].out_channels
-        # stride=4 to go 256→64 in spatial dims
-        self.tex_proj = nn.Sequential(
-            nn.Conv2d(12, out_ch, kernel_size=3, padding=1, stride=4, bias=False),
-            nn.GELU(),
-        )
 
 
     def forward(self, x: torch.Tensor):
@@ -201,20 +194,24 @@ class AutoSamSegGabor2(nn.Module):
             )  # (B,12,H',W')
 
         
-        tex_emb = self.tex_proj(tex)
+        # 4) downsample Gabor to match encoder spatial dims
+        Hf, Wf = img_emb.shape[-2:]
+        gabor_feats = F.interpolate(
+            tex,
+            (Hf, Wf),
+            mode='bilinear',
+            align_corners=False)
             
 
-        # 5) fuse
-        fused = img_emb + tex_emb  # (B,D,H',W')
-
         # 5) positional encoding
-        Hf, Wf = fused.shape[-2:]
+        Hf, Wf = img_emb.shape[-2:]
         img_pe = self.pe_layer([Hf, Wf]).unsqueeze(0)  # (1,D,Hf,Wf)
 
         # 7) decode
         mask, iou_pred = self.mask_decoder(
-            image_embeddings=fused.unsqueeze(1),
+            image_embeddings=img_emb.unsqueeze(1),
             image_pe=img_pe,
+            gabor_feats=gabor_feats
         )
 
         # 8) resize back

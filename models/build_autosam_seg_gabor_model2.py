@@ -4,7 +4,7 @@ from functools import partial
 
 from .SamFeatSeg import SamFeatSeg, SegDecoderCNN
 from .AutoSamSeg import AutoSamSegGabor2
-from .sam_decoder import MaskDecoder
+from .sam_decoder import MaskDecoder2
 from segment_anything.modeling import ImageEncoderViT, TwoWayTransformer
 
 
@@ -34,7 +34,7 @@ def _build_sam_seg_model(
             window_size=14,
             out_chans=prompt_embed_dim,
         ),
-        seg_decoder=MaskDecoder(
+        seg_decoder=MaskDecoder2(
             num_multimask_outputs=1,
             transformer=TwoWayTransformer(
                 depth=2,
