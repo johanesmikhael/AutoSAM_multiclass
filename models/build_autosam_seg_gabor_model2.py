@@ -99,7 +99,7 @@ def build_sam_vit_b_seg_cnn(num_classes=14, checkpoint=None):
     )
 
 
-sam_seg_gabor_model_registry = {
+sam_seg_gabor_model_registry2 = {
     "default": build_sam_seg,
     "vit_h": build_sam_seg,
     "vit_l": build_sam_vit_l_seg_cnn,
