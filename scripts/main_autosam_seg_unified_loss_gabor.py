@@ -274,9 +274,13 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, optimizer, scheduler, epoch, args, writer)
         val_dice = validate(val_loader, model, epoch, args, writer)
 
-        if val_dice > best_dice:
-            is_best = True
-            best_dice = val_dice
+        # Adjust learning rate based on validation loss
+        if epoch >= 10:
+            scheduler.step(val_dice)
+
+        is_best = val_dice > best_dice
+        best_dice = max(best_dice, val_dice)
+
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -285,6 +289,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'epoch': epoch + 1,
                 'state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
                 'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
+                'tex_conv_state_dict':   (model.module if hasattr(model, 'module') else model).tex_conv.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, filename=filename)
 
@@ -297,6 +302,7 @@ def main_worker(gpu, ngpus_per_node, args):
             'epoch': args.epochs,
             'mask_decoder_state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
             'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
+            'tex_conv_state_dict':   (model.module if hasattr(model, 'module') else model).tex_conv.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, is_best=True, filename=final_fname)
 
@@ -312,29 +318,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
 def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
-    # batch_time = AverageMeter('Time', ':6.3f')
-    # data_time = AverageMeter('Data', ':6.3f')
-    # losses = AverageMeter('Loss', ':.4e')
-    # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
-    # ce_loss = torch.nn.CrossEntropyLoss()
-
-
-    # if class_weights_tensor is not None:
-    #     ce_loss = torch.nn.CrossEntropyLoss(weight=class_weights_tensor)
-    #     # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False, rebalance_weights=class_weights_tensor)
-    # else:
-    #     ce_loss = torch.nn.CrossEntropyLoss()
-    #     # dice_loss = SoftDiceLoss(batch_dice=True, do_bg=False)
-
-
-    # if args.px_loss == 'focal':
-    #     px_loss = FocalLoss(
-    #         gamma=2.0,
-    #         weight=class_weights_tensor
-    #     )
-    # else:
-    #     px_loss = torch.nn.CrossEntropyLoss(weight=class_weights_tensor)  # or args.ignore_index)
-
 
     # choose and instantiate the multiclass unified focal loss
     if args.loss_type == 'sym':
@@ -358,8 +341,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
 
     # switch to train mode
     model.train()
-    # keep the encoder frozen
-    model.image_encoder.eval()
+
 
     end = time.time()
     for i, tup in enumerate(train_loader):
@@ -417,9 +399,6 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
         if i % args.print_freq == 0:
             print('Train: [{0}][{1}/{2}]\t'
                   'loss {loss:.4f}'.format(epoch, i, len(train_loader), loss=loss.item()))
-
-    if epoch >= 10:
-        scheduler.step(loss)
 
 
 

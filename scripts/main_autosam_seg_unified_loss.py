@@ -225,7 +225,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # param.requires_grad = True
 
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-    scheduler = ReduceLROnPlateau(optimizer, 'min')
+    scheduler = ReduceLROnPlateau(optimizer, 'max')
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -274,9 +274,13 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, optimizer, scheduler, epoch, args, writer)
         val_dice = validate(val_loader, model, epoch, args, writer)
 
-        if val_dice > best_dice:
-            is_best = True
-            best_dice = val_dice
+        # Adjust learning rate based on validation loss
+        if epoch >= 10:
+            scheduler.step(val_dice)
+
+        is_best = val_dice > best_dice
+        best_dice = max(best_dice, val_dice)
+
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -417,9 +421,6 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
         if i % args.print_freq == 0:
             print('Train: [{0}][{1}/{2}]\t'
                   'loss {loss:.4f}'.format(epoch, i, len(train_loader), loss=loss.item()))
-
-    if epoch >= 10:
-        scheduler.step(loss)
 
 
 
