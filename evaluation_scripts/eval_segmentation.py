@@ -9,6 +9,10 @@ from PIL import Image
 from models import sam_seg_model_registry
 from dataset import generate_test_loader
 from evaluate import test_material
+import random
+import torch.backends.cudnn as cudnn
+import warnings
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Evaluate segmentation model')
@@ -37,7 +41,9 @@ def parse_args():
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
     parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
-                    help='number of data loading workers (default: 1)')
+                    help='number of data loading workers (default: 1)'),
+    parser.add_argument('--seed', type=int, default=None,
+                        help='seed for reproducibility')
     return parser.parse_args()
 
 def evaluate_model(args):
@@ -136,6 +142,15 @@ def evaluate_model(args):
 
 def main():
     args = parse_args()
+    if args.seed is not None:
+        random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        cudnn.deterministic = True
+        warnings.warn('You have chosen to seed training. '
+                      'This will turn on the CUDNN deterministic setting, '
+                      'which can slow down your training considerably! '
+                      'You may see unexpected behavior when restarting '
+                      'from checkpoints.')
     args.distributed = False
     evaluate_model(args)
 
