@@ -78,15 +78,17 @@ class AutoSamSegGabor(nn.Module):
         original_size = W
 
         # 1) resize for encoder
-        x_resized = F.interpolate(
-            x, (self.image_encoder.img_size,)*2,
-            mode='bilinear', align_corners=False
+        x = F.interpolate(
+            x,
+            (self.image_encoder.img_size, self.image_encoder.img_size),
+            mode="bilinear",
+            align_corners=False,
         )
 
         # 2) compute texture map
-        gray = (0.2989 * x_resized[:,0]
-              + 0.5870 * x_resized[:,1]
-              + 0.1140 * x_resized[:,2]).unsqueeze(1)  # (B,1,H',W')
+        gray = (0.2989 * x[:,0]
+              + 0.5870 * x[:,1]
+              + 0.1140 * x[:,2]).unsqueeze(1)  # (B,1,H',W')
         tex = F.conv2d(
             gray,
             self.gabor_kernels,
@@ -96,7 +98,7 @@ class AutoSamSegGabor(nn.Module):
 
         # 3) frozen image features
         with torch.no_grad():
-            img_emb = self.image_encoder(x_resized)  # (B,D,H',W')
+            img_emb = self.image_encoder(x)  # (B,D,H',W')
 
         # 4) fuse
         fused = img_emb + tex_emb  # (B,D,H',W')
