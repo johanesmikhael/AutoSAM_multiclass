@@ -124,22 +124,22 @@ class AutoSamSegGabor(nn.Module):
 
 
         # 2) frozen image features
-        # with torch.no_grad():
-        img_emb = self.image_encoder(x)  # (B,D,H',W')
+        with torch.no_grad():
+            img_emb = self.image_encoder(x)  # (B,D,H',W')
 
-        # 3) compute texture map
-        gray = (0.2989 * x[:,0]
-            + 0.5870 * x[:,1]
-            + 0.1140 * x[:,2]).unsqueeze(1)  # (B,1,H',W')
-        tex = F.conv2d(
-            gray,
-            self.gabor_kernels,
-            padding=self.gabor_kernels.shape[-1]//2
-        )  # (B,12,H',W')
-        
-        # 4) image features
-        tex_patches = self.tex_proj(tex)       # (B,embed_dim,64,64)
-        tex_emb     = self.tex_neck(tex_patches)  # (B,out_chans,64,64)
+            # 3) compute texture map
+            gray = (0.2989 * x[:,0]
+                + 0.5870 * x[:,1]
+                + 0.1140 * x[:,2]).unsqueeze(1)  # (B,1,H',W')
+            tex = F.conv2d(
+                gray,
+                self.gabor_kernels,
+                padding=self.gabor_kernels.shape[-1]//2
+            )  # (B,12,H',W')
+            
+            # 4) image features
+            tex_patches = self.tex_proj(tex)       # (B,embed_dim,64,64)
+            tex_emb     = self.tex_neck(tex_patches)  # (B,out_chans,64,64)
 
         # 5) fuse
         fused = img_emb + tex_emb  # (B,D,H',W')
