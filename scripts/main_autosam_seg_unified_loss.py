@@ -356,6 +356,8 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
 
     # switch to train mode
     model.train()
+    # keep the encoder frozen
+    model.image_encoder.eval()
 
     end = time.time()
     for i, tup in enumerate(train_loader):
