@@ -40,7 +40,7 @@ from loss_functions.unified_loss import (
     symmetric_unified_focal_multiclass,
     asymmetric_unified_focal_multiclass)
 
-from models import sam_seg_model_registry
+from models import sam_seg_gabor_model_registry
 from dataset import generate_dataset, generate_test_loader
 from evaluate import test_synapse, test_acdc, test_brats, test_material
 
@@ -184,7 +184,7 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.model_type == 'vit_b':
         model_checkpoint = 'cp/sam_vit_b_01ec64.pth'
 
-    model = sam_seg_model_registry[args.model_type](num_classes=args.num_classes, checkpoint=model_checkpoint)
+    model = sam_seg_gabor_model_registry[args.model_type](num_classes=args.num_classes, checkpoint=model_checkpoint)
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
