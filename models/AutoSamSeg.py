@@ -140,6 +140,99 @@ class AutoSamSegGabor(nn.Module):
 
 
 
+class AutoSamSegGabor2(nn.Module):
+    def __init__(
+        self,
+        image_encoder: nn.Module,
+        seg_decoder: nn.Module,
+        img_size: int = 1024,
+    ):
+        super().__init__()
+        self.img_size = img_size
+        self.image_encoder = image_encoder
+        self.mask_decoder = seg_decoder
+        self.pe_layer = PositionEmbeddingRandom(128)
+
+        # 4 orientations × 3 scales = 12 filters
+        orientations = [0, np.pi/4, np.pi/2, 3*np.pi/4]
+        scales       = [8, 16, 32]
+        gabor_bank = make_gabor_bank(
+            ksize=31,
+            sigmas=[0.56 * s for s in scales],
+            thetas=orientations,
+            lambd=16.0,
+        )  # → (12,1,31,31)
+        self.register_buffer('gabor_kernels', gabor_bank)
+
+        # project 12 → out_chans *and* downsample from 256→64 in one go
+        out_ch = self.image_encoder.neck[0].out_channels
+        # stride=4 to go 256→64 in spatial dims
+        self.tex_proj = nn.Sequential(
+            nn.Conv2d(12, out_ch, kernel_size=3, padding=1, stride=4, bias=False),
+            nn.GELU(),
+        )
+
+
+    def forward(self, x: torch.Tensor):
+        B, C, H, W = x.shape
+        original_size = W
+
+        # 1) resize for encoder
+        x = F.interpolate(
+            x,
+            (self.image_encoder.img_size, self.image_encoder.img_size),
+            mode="bilinear",
+            align_corners=False,
+        )
+
+        # 2) frozen image features
+        with torch.no_grad():
+            img_emb = self.image_encoder(x)  # (B,D,H',W')
+
+            # 3) compute texture map
+            gray = (0.2989 * x[:,0]
+                + 0.5870 * x[:,1]
+                + 0.1140 * x[:,2]).unsqueeze(1)  # (B,1,H',W')
+            gray = F.interpolate(gray, (256, 256), mode='bilinear', align_corners=False)
+            tex = F.conv2d(
+                gray,
+                self.gabor_kernels,
+                padding=self.gabor_kernels.shape[-1]//2
+            )  # (B,12,H',W')
+
+        
+        tex_emb = self.tex_proj(tex)
+            
+
+        # 5) fuse
+        fused = img_emb + tex_emb  # (B,D,H',W')
+
+        # 5) positional encoding
+        Hf, Wf = fused.shape[-2:]
+        img_pe = self.pe_layer([Hf, Wf]).unsqueeze(0)  # (1,D,Hf,Wf)
+
+        # 7) decode
+        mask, iou_pred = self.mask_decoder(
+            image_embeddings=fused.unsqueeze(1),
+            image_pe=img_pe,
+        )
+
+        # 8) resize back
+        if mask.shape[-1] != original_size:
+            mask = F.interpolate(
+                mask, (original_size,)*2,
+                mode='bilinear', align_corners=False
+            )
+        return mask, iou_pred
+
+    def get_embedding(self, x: torch.Tensor):
+        x = F.interpolate(
+            x, (self.img_size,)*2,
+            mode="bilinear", align_corners=False,
+        )
+        emb = self.image_encoder(x)
+        return nn.functional.adaptive_avg_pool2d(emb, 1).squeeze()
+
 
 class AutoSamSeg(nn.Module):
     def __init__(
