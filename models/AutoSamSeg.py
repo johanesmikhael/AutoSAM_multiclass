@@ -64,7 +64,8 @@ class AutoSamSegGabor(nn.Module):
             ksize=31,
             sigmas=[0.56 * s for s in scales],
             thetas=orientations,
-            lambd=16.0,
+            lambd=6.0,
+            # it was 16.0
         )  # → (12,1,31,31)
         self.register_buffer('gabor_kernels', gabor_bank)
 
@@ -83,7 +84,7 @@ class AutoSamSegGabor(nn.Module):
         # 1) resize for encoder
         x = F.interpolate(
             x,
-            (self.image_encoder.img_size, self.image_encoder.img_size),
+            (256, 256), # self.image_encoder.img_size),
             mode="bilinear",
             align_corners=False,
         )
