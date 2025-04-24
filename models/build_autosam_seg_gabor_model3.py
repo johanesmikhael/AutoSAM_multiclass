@@ -65,7 +65,7 @@ def _build_sam_seg_model(
     return sam_seg
 
 
-def build_sam_vit_h_seg_cnn(num_classes=14, checkpoint=None):
+def build_sam_vit_h_seg_cnn(num_classes=14, checkpoint=None, lambd=16.0):
     return _build_sam_seg_model(
         encoder_embed_dim=1280,
         encoder_depth=32,
@@ -73,6 +73,7 @@ def build_sam_vit_h_seg_cnn(num_classes=14, checkpoint=None):
         encoder_global_attn_indexes=[7, 15, 23, 31],
         num_classes=num_classes,
         checkpoint=checkpoint,
+        lambd=lambd
     )
 
 
