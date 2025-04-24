@@ -229,6 +229,7 @@ class AutoSamSegGabor2(nn.Module):
         )
         emb = self.image_encoder(x)
         return nn.functional.adaptive_avg_pool2d(emb, 1).squeeze()
+    
 
 
 class AutoSamSeg(nn.Module):
