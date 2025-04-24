@@ -174,7 +174,7 @@ class MaskDecoder3(nn.Module):
         else:
             fused = img_emb
         
-        fused = fused.expand(-1, output_tokens.shape[0], -1, -1, -1).flatten(0, 1)  # (B*M, D, H', W')
+        fused = fused.unsqueeze(1).expand(-1, output_tokens.shape[0], -1, -1, -1).flatten(0, 1)  # (B*M, D, H', W')
 
         
         pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
