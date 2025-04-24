@@ -88,7 +88,7 @@ class AutoSamSegGabor(nn.Module):
             align_corners=False,
         )
 
-        x_reduced = x = F.interpolate(
+        x_reduced = F.interpolate(
             x,
             (256, 256),
             mode="bilinear",
