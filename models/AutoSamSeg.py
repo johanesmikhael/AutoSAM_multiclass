@@ -64,8 +64,7 @@ class AutoSamSegGabor(nn.Module):
             ksize=31,
             sigmas=[0.56 * s for s in scales],
             thetas=orientations,
-            lambd=6.0,
-            # it was 16.0
+            lambd=6.0,  #it was 16.0
         )  # → (12,1,31,31)
         self.register_buffer('gabor_kernels', gabor_bank)
 
@@ -84,7 +83,14 @@ class AutoSamSegGabor(nn.Module):
         # 1) resize for encoder
         x = F.interpolate(
             x,
-            (256, 256), # self.image_encoder.img_size),
+            (self.image_encoder.img_size, self.image_encoder.img_size),
+            mode="bilinear",
+            align_corners=False,
+        )
+
+        x_reduced = x = F.interpolate(
+            x,
+            (256, 256),
             mode="bilinear",
             align_corners=False,
         )
@@ -95,9 +101,9 @@ class AutoSamSegGabor(nn.Module):
             img_emb = self.image_encoder(x)  # (B,D,H',W')
 
             # 3) compute texture map
-            gray = (0.2989 * x[:,0]
-                + 0.5870 * x[:,1]
-                + 0.1140 * x[:,2]).unsqueeze(1)  # (B,1,H',W')
+            gray = (0.2989 * x_reduced[:,0]
+                + 0.5870 * x_reduced[:,1]
+                + 0.1140 * x_reduced[:,2]).unsqueeze(1)  # (B,1,H',W')
             tex = F.conv2d(
                 gray,
                 self.gabor_kernels,
