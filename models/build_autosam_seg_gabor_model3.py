@@ -15,6 +15,7 @@ def _build_sam_seg_model(
     encoder_global_attn_indexes,
     num_classes,
     checkpoint=None,
+    lambd=16.0
 ):
     prompt_embed_dim = 256
     image_size = 1024
@@ -47,6 +48,7 @@ def _build_sam_seg_model(
             iou_head_hidden_dim=256,
             num_classes=num_classes,
         ),
+        lambd=lambd
     )
 
     if checkpoint is not None:

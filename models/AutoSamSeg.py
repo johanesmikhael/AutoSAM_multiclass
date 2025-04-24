@@ -146,6 +146,7 @@ class AutoSamSegGabor2(nn.Module):
         image_encoder: nn.Module,
         seg_decoder: nn.Module,
         img_size: int = 1024,
+        lambd=16.0
     ):
         super().__init__()
         self.img_size = img_size
@@ -160,7 +161,7 @@ class AutoSamSegGabor2(nn.Module):
             ksize=31,
             sigmas=[0.56 * s for s in scales],
             thetas=orientations,
-            lambd=16.0,
+            lambd=lambd,
         )  # → (12,1,31,31)
         self.register_buffer('gabor_kernels', gabor_bank)
 
