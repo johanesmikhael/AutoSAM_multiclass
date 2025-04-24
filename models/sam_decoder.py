@@ -51,7 +51,10 @@ class MaskDecoder2(nn.Module):
         self.num_classes = num_classes
 
         # Gabor fusion: project 12-channel Gabor maps into transformer_dim
-        self.texture_proj = nn.Conv2d(12, transformer_dim, kernel_size=1, bias=False)
+        self.texture_proj = nn.Sequential(
+            nn.Conv2d(12, transformer_dim, kernel_size=1, bias=False),
+            nn.GELU(),                # ← add activation here
+        )
 
         # mask tokens
         self.iou_token = nn.Embedding(num_classes, transformer_dim)
