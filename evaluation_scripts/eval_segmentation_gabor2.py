@@ -72,7 +72,7 @@ def evaluate_model(args):
         pe  = model.module.pe_layer     if hasattr(model, 'module') else model.pe_layer
 
         # load state_dicts
-        dec.load_state_dict(checkpoint['stae_dict'])
+        dec.load_state_dict(checkpoint['state_dict'])
         pe.load_state_dict( checkpoint['pe_layer_state_dict']    )
 
         print(f"=> Loaded checkpoint '{args.checkpoint}' (epoch {checkpoint['epoch']})")
