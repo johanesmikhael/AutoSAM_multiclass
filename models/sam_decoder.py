@@ -131,65 +131,58 @@ class MaskDecoder3(nn.Module):
     def predict_masks_1(
         self,
         image_embeddings: torch.Tensor,
-        image_pe: torch.Tensor,
-        gabor_feats: Optional[torch.Tensor] = None,
+        image_pe:       torch.Tensor,
+        gabor_feats:    Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Predicts masks. See 'forward' for more details."""
-
         B, _, D, Hf, Wf = image_embeddings.shape
-        # 1) cross-attn fusion as before …
-        if gabor_feats is not None:
-            tex = self.texture_proj(gabor_feats)                          # (B, D, Hf, Wf)
-            T = Hf * Wf
-            tex_seq = tex.view(B, D, T).permute(2,0,1)                     # (T, B, D)
-            img_seq = image_embeddings.squeeze(1).view(B, D, T).permute(2,0,1)
-            attn_out, _ = self.texture_attention( query=img_seq,
-                                                  key=tex_seq,
-                                                  value=tex_seq )
-            attn_out = attn_out.permute(1,2,0).view(B, D, Hf, Wf)
-            fused_emb = image_embeddings.squeeze(1) + attn_out
-        else:
-            fused_emb = image_embeddings.squeeze(1)
 
-        ## tokens: batch × tokens × dim
+        # ——— 1) Cross‐attention fusion (unchanged) ———
+        if gabor_feats is not None:
+            tex    = self.texture_proj(gabor_feats)                   # (B, D, Hf, Wf)
+            T      = Hf * Wf
+            tex_seq = tex.view(B, D, T).permute(2,0,1)                 # (T, B, D)
+            img_seq = image_embeddings.squeeze(1).view(B, D, T).permute(2,0,1)
+            attn_out, _ = self.texture_attention(
+                query=img_seq, key=tex_seq, value=tex_seq
+            )
+            attn_out   = attn_out.permute(1,2,0).view(B, D, Hf, Wf)
+            fused_emb  = image_embeddings.squeeze(1) + attn_out
+        else:
+            fused_emb = image_embeddings.squeeze(1)                  # (B, D, Hf, Wf)
+
+        # ——— 2) Build tokens exactly like SAM ———
         all_tokens = torch.cat([
-            self.iou_token.weight,       # (num_classes,    D)
-            self.mask_tokens.weight      # (num_classes*num_mask_tokens, D)
+            self.iou_token.weight,      # (num_classes,    D)
+            self.mask_tokens.weight     # (num_classes*num_mask_tokens, D)
         ], dim=0)                        # → (M, D)
         tokens = all_tokens.unsqueeze(0).repeat(B, 1, 1)  # (B, M, D)
 
-        # 3) expand fused embeddings to match tokens
-        src = fused_emb.unsqueeze(1).expand(-1, tokens.shape[0] // B, -1, -1, -1)
-        src = src.flatten(0, 1)                           # (B*M, D, Hf, Wf)
+        # ——— 3) Call the transformer with full-rank tensors ———
+        #    src:       (B, D, Hf, Wf)
+        #    image_pe:  (1, D, Hf, Wf)
+        #    tokens:    (B, M, D)
+        hs, src_out = self.transformer(fused_emb, image_pe, tokens)
 
-        # 4) positional embeddings
-        # flatten your image_pe (1,D,Hf,Wf) → (T,1,D) then repeat B*M/T times
-        T = Hf * Wf
-        pe_seq = image_pe.view(1, D, T).permute(2,0,1)     # (T, 1, D)
-        pe_seq = pe_seq.repeat(1, tokens.shape[0], 1)      # (T, B*M, D)
+        # ——— 4) Unpack and upsample as before ———
+        iou_token_out   = hs[:, 0, :]
+        mask_tokens_out = hs[:, 1:(1 + self.num_mask_tokens), :]
 
+        # src_out back to spatial:
+        upscaled_embedding = self.output_upscaling(src_out)  # (B, transformer_dim//8, Hf*2, Wf*2)
 
-        b, c, h, w = src.shape
-
-        # Run the transformer
-        hs, src = self.transformer(src, pe_seq, tokens)
-        iou_token_out = hs[:, 0, :]
-        mask_tokens_out = hs[:, 1 : (1 + self.num_mask_tokens), :]
-
-        # Upscale mask embeddings and predict masks using the mask tokens
-        src = src.transpose(1, 2).view(b, c, h, w)
-        upscaled_embedding = self.output_upscaling(src)
-        hyper_in_list: List[torch.Tensor] = []
-        for i in range(self.num_mask_tokens):
-            hyper_in_list.append(self.output_hypernetworks_mlps[i](mask_tokens_out[:, i, :]))
-        hyper_in = torch.stack(hyper_in_list, dim=1)
+        # build masks
         b, c, h, w = upscaled_embedding.shape
-        masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)).view(b, -1, h, w)
+        hyper_in = torch.stack([
+            mlp(mask_tokens_out[:, i, :])
+            for i, mlp in enumerate(self.output_hypernetworks_mlps)
+        ], dim=1)  # (B, num_mask_tokens, transformer_dim//8)
 
-        # Generate mask quality predictions
-        iou_pred = self.iou_prediction_head(iou_token_out)
+        masks = (hyper_in @ upscaled_embedding.view(b, c, h*w)) \
+                .view(b, -1, h, w)
+        iou   = self.iou_prediction_head(iou_token_out)
 
-        return masks, iou_pred
+        return masks, iou
+
 
 
 class MaskDecoder2(nn.Module):
