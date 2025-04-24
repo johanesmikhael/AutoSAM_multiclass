@@ -151,13 +151,12 @@ class MaskDecoder3(nn.Module):
         else:
             fused_emb = image_embeddings.squeeze(1)
 
-        # 2) build tokens exactly like original SAM
+        ## tokens: batch × tokens × dim
         all_tokens = torch.cat([
-            self.iou_token.weight,      # (num_classes, D)
-            self.mask_tokens.weight     # (num_classes*num_mask_tokens, D)
-        ], dim=0)                      # → (M, D)
+            self.iou_token.weight,       # (num_classes,    D)
+            self.mask_tokens.weight      # (num_classes*num_mask_tokens, D)
+        ], dim=0)                        # → (M, D)
         tokens = all_tokens.unsqueeze(0).repeat(B, 1, 1)  # (B, M, D)
-        tokens = tokens.flatten(0, 1)                     # (B*M, D)
 
         # 3) expand fused embeddings to match tokens
         src = fused_emb.unsqueeze(1).expand(-1, tokens.shape[0] // B, -1, -1, -1)
@@ -306,58 +305,49 @@ class MaskDecoder2(nn.Module):
         image_pe: torch.Tensor,
         gabor_feats: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Predicts masks. See 'forward' for more details."""
+        B, _, D, Hf, Wf = image_embeddings.shape
 
-
-        # Concatenate output tokens
-        mask_tokens = self.mask_tokens.weight.view(-1, self.num_mask_tokens, self.transformer_dim)
-        output_tokens = torch.cat([self.iou_token.weight.unsqueeze(1), mask_tokens], dim=1)
-        tokens = output_tokens.repeat(image_embeddings.size(0), 1, 1)
-
-        # expand image embeddings per mask
-
-        # Expand per-image data in batch direction to be per-mask
-        # src = image_embeddings.expand(-1, output_tokens.shape[0], -1, -1, -1).flatten(0, 1)
-        # pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
-
-
-        # Expand per-image data in batch direction to be per-mask
-        src = image_embeddings.expand(-1, output_tokens.shape[0], -1, -1, -1)
-        Bm, M, D, Hf, Wf = src.shape
-        src = src.flatten(0, 1)  # (B*M, D, H', W')
-
-        # fuse Gabor if provided
+        # 1) Cross‐attention fusion (unchanged)
         if gabor_feats is not None:
-            # project and expand
-            tex = self.texture_proj(gabor_feats)              # (B, D, H', W')
-            tex = tex.unsqueeze(1).expand(-1, M, -1, -1, -1)  # (B, M, D, H', W')
-            tex = tex.flatten(0, 1)                           # (B*M, D, H', W')
-            src = src + tex
+            tex = self.texture_proj(gabor_feats)                       # (B, D, Hf, Wf)
+            T = Hf * Wf
+            tex_seq = tex.view(B, D, T).permute(2,0,1)                  # (T, B, D)
+            img_seq = image_embeddings.squeeze(1).view(B, D, T).permute(2,0,1)
+            attn_out, _ = self.texture_attention(q=img_seq, k=tex_seq, v=tex_seq)
+            attn_out = attn_out.permute(1,2,0).view(B, D, Hf, Wf)
+            fused_emb = image_embeddings.squeeze(1) + attn_out
+        else:
+            fused_emb = image_embeddings.squeeze(1)                    # (B, D, Hf, Wf)
 
-        
-        pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
+        # 2) Build tokens exactly as SAM does
+        all_tokens = torch.cat([
+            self.iou_token.weight,      # (num_classes, D)
+            self.mask_tokens.weight     # (num_classes*num_mask_tokens, D)
+        ], dim=0)                       # → (M, D)
+        tokens = all_tokens.unsqueeze(0).repeat(B, 1, 1)  # (B, M, D)
 
-        b, c, h, w = src.shape
+        # 3) Call transformer with the right shapes—no flatten!
+        hs, src_out = self.transformer(
+            fused_emb,   # (B, D, Hf, Wf)
+            image_pe,    # (1, D, Hf, Wf)
+            tokens       # (B, M, D)
+        )
 
-        # Run the transformer
-        hs, src = self.transformer(src, pos_src, tokens)
-        iou_token_out = hs[:, 0, :]
-        mask_tokens_out = hs[:, 1 : (1 + self.num_mask_tokens), :]
+        # 4) Extract IoU and mask tokens & upscale as before
+        iou_token_out   = hs[:, 0, :]
+        mask_tokens_out = hs[:, 1:(1 + self.num_mask_tokens), :]
 
-        # Upscale mask embeddings and predict masks using the mask tokens
-        src = src.transpose(1, 2).view(b, c, h, w)
-        upscaled_embedding = self.output_upscaling(src)
-        hyper_in_list: List[torch.Tensor] = []
-        for i in range(self.num_mask_tokens):
-            hyper_in_list.append(self.output_hypernetworks_mlps[i](mask_tokens_out[:, i, :]))
-        hyper_in = torch.stack(hyper_in_list, dim=1)
-        b, c, h, w = upscaled_embedding.shape
-        masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)).view(b, -1, h, w)
+        # src_out is back to (B, D, Hf, Wf)
+        up = self.output_upscaling(src_out)
+        hyper = torch.stack([
+            mlp(mask_tokens_out[:, i, :]) for i, mlp in enumerate(self.output_hypernetworks_mlps)
+        ], dim=1)  # (B, num_mask_tokens, transformer_dim//8)
 
-        # Generate mask quality predictions
-        iou_pred = self.iou_prediction_head(iou_token_out)
+        b, c, h, w = up.shape
+        masks = (hyper @ up.view(b, c, h*w)).view(b, -1, h, w)
+        iou   = self.iou_prediction_head(iou_token_out)
 
-        return masks, iou_pred
+        return masks, iou
     
 
 class MaskDecoder(nn.Module):
