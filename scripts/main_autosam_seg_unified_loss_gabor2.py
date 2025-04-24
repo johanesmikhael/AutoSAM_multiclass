@@ -289,7 +289,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 'epoch': epoch + 1,
                 'state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
                 'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
-                'tex_conv_state_dict':   (model.module if hasattr(model, 'module') else model).tex_proj.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, filename=filename)
 
@@ -302,7 +301,6 @@ def main_worker(gpu, ngpus_per_node, args):
             'epoch': args.epochs,
             'mask_decoder_state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
             'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
-            'tex_conv_state_dict':   (model.module if hasattr(model, 'module') else model).tex_proj.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, is_best=True, filename=final_fname)
 
