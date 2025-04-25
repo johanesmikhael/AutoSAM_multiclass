@@ -47,7 +47,9 @@ def parse_args():
     parser.add_argument('--residual', default=False, action='store_true',
                     help='whether to use residual connections in feature fusion')
     parser.add_argument('--gated', default=False, action='store_true',
-                        help='whether to use learnable static gate in feature fusion')
+                    help='whether to use learnable static gate in feature fusion')
+    parser.add_argument('--fuse_nlayers', default=3, type=int,
+                        help='number of n-first layers to be fused')
     return parser.parse_args()
 
 def evaluate_model(args):
@@ -62,8 +64,11 @@ def evaluate_model(args):
         raise ValueError("Unsupported model type: {}".format(args.model_type))
     
     # Create model using the registry.
-    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes,
-                                                    checkpoint=base_checkpoint)
+    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, 
+                                                            residual=args.residual,
+                                                            gated=args.gated,
+                                                            fuse_nlayers=args.fuse_nlayers,
+                                                            checkpoint=base_checkpoint)
     
     # Load the saved checkpoint (decoder + pe_layer).
     if os.path.isfile(args.checkpoint):
