@@ -263,6 +263,35 @@ class MultiScaleFusion(nn.Module):
         return fused
     
 
+class StaticGatedFusion(nn.Module):
+    def __init__(self, in_chs, out_ch):
+        super().__init__()
+        self.projs = nn.ModuleList([
+            nn.Sequential(nn.Conv2d(ic, out_ch, 1, bias=False), nn.GELU())
+            for ic in in_chs
+        ])
+        # one gate per scale, init to 1.0
+        self.gates = nn.Parameter(torch.ones(len(in_chs)))
+        # one post‐fusion LayerNorm2d
+        self.post_norm = LayerNorm2d(out_ch)
+
+    def forward(self, feats, orig_neck=None, use_residual=False):
+        # project each scale
+        proj_feats = [proj(f) for proj, f in zip(self.projs, feats)]
+        # apply sigmoid to keep gates in (0,1)
+        gate_vals = torch.sigmoid(self.gates).unsqueeze(1).unsqueeze(2).unsqueeze(3)
+        # weighted sum
+        fused = sum(g * f for g, f in zip(gate_vals, proj_feats))
+        if use_residual and orig_neck is not None:
+            fused = fused + orig_neck
+
+        # single normalization after fusion
+        fused = self.post_norm(fused)
+
+        return fused
+
+    
+
 class FusionWithPostNorm(nn.Module):
     def __init__(self, in_chs, out_ch):
         super().__init__()

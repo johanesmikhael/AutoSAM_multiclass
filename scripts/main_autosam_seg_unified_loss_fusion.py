@@ -119,6 +119,8 @@ parser.add_argument('--uf_gamma',  type=float, default=0.5,
                     help="γ focal parameter (hard‐example emphasis)")
 parser.add_argument('--residual', default=False, action='store_true',
                     help='whether to use residual connections in feature fusion')
+parser.add_argument('--gated', default=False, action='store_true',
+                    help='whether to use learnable static gate in feature fusion')
 
 
 def main():
@@ -186,7 +188,7 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.model_type == 'vit_b':
         model_checkpoint = 'cp/sam_vit_b_01ec64.pth'
 
-    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, residual=args.residual, checkpoint=model_checkpoint)
+    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, residual=args.residual, gated=args.gated, checkpoint=model_checkpoint)
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
