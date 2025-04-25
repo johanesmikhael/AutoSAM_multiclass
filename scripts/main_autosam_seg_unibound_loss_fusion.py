@@ -425,7 +425,9 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
 
         dist_maps = compute_sdf_per_class(y_onehot)
 
-        loss = criterion(pred_softmax, y_onehot) + 0.1 * boundary_loss(pred_softmax, dist_maps)
+        loss_a = criterion(pred_softmax, y_onehot)
+        loss_b = boundary_loss(pred_softmax, dist_maps)
+        loss = loss_a + 0.05 * loss_b
 
 
 
@@ -442,6 +444,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
         if i % args.print_freq == 0:
             print('Train: [{0}][{1}/{2}]\t'
                   'loss {loss:.4f}'.format(epoch, i, len(train_loader), loss=loss.item()))
+            print(f'loss_a: {loss_a.item():.4f}, loss_b: {loss_b.item():.4f}')
 
 
 
