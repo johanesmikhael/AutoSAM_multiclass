@@ -69,5 +69,4 @@ class BoundaryLoss():
 
         return loss
 
-# Alias for compatibility
-BoundaryLoss = SurfaceLoss
+
