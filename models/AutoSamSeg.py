@@ -240,6 +240,108 @@ class AutoSamSegGabor2(nn.Module):
     
 
 
+
+class MultiScaleFusion(nn.Module):
+    def __init__(self, in_chs, out_ch):
+        """
+        in_chs: list of channel‐dims for each tapped feature
+        out_ch: channel‐dim expected by the mask decoder (i.e. encoder.neck out_channels)
+        """
+        super().__init__()
+        # 1×1 to project each tapped feature → out_ch
+        self.projs = nn.ModuleList([
+            nn.Conv2d(c, out_ch, kernel_size=1, bias=False)
+            for c in in_chs
+        ])
+        # fuse concat(out_ch * len(in_chs)) → out_ch
+        self.fuse = nn.Sequential(
+            nn.Conv2d(len(in_chs)*out_ch, out_ch, kernel_size=3, padding=1, bias=False),
+            nn.GELU(),
+        )
+
+    def forward(self, feats):
+        # feats: list of [ (B, in_chs[i], H_i, W_i) for i in range(len(in_chs)) ]
+        # bring all to the same H*,W* (from the last feature in feats)
+        H, W = feats[-1].shape[-2:]
+        out = []
+        for proj, f in zip(self.projs, feats):
+            f = proj(f)                     # → (B, out_ch, H_i, W_i)
+            if f.shape[-2:] != (H, W):
+                f = F.interpolate(f, (H, W), mode='bilinear', align_corners=False)
+            out.append(f)
+        x = torch.cat(out, dim=1)          # → (B, out_ch * len(in_chs), H, W)
+        return self.fuse(x)                # → (B, out_ch, H, W)
+
+
+class AutoSamSegWithFusion(nn.Module):
+    def __init__(self,
+                 image_encoder,        # your ViT encoder
+                 seg_decoder,         # your MaskDecoder
+                 fuse_block_indices = [0, 1, 2],  # e.g. [2, 5, 8, 11]
+                 img_size=1024):
+        super().__init__()
+        self.img_size = img_size
+        self.image_encoder  = image_encoder
+        self.mask_decoder  = seg_decoder
+        self.pe_layer = PositionEmbeddingRandom(128)
+
+        # the neck's first conv_out channels is what goes into the MaskDecoder:
+        out_ch = self.encoder.neck[0].out_channels
+
+        # gather channel dims for each tapped block + the neck
+        in_chs = [ self.encoder.patch_embed.proj.out_channels ]  # optional: you could include the patch‐embed output too
+        for i in fuse_block_indices:
+            # after block i, feature dim is embed_dim
+            in_chs.append(self.encoder.blocks[i].attn.qkv.in_features)
+        # finally the neck output
+        in_chs.append(out_ch)
+
+        self.fuse_idxs = fuse_block_indices
+        self.fuser     = MultiScaleFusion(in_chs, out_ch)
+
+    def forward(self, x):
+        B,_,H0,W0 = x.shape
+        # 1) resize to encoder size
+        x = F.interpolate(x,
+                          (self.encoder.img_size, self.encoder.img_size),
+                          mode='bilinear', align_corners=False)
+
+        # 2) patch‐embed & abs‐pos
+        x = self.encoder.patch_embed(x)  # → (B, Hp, Wp, C)
+        if self.encoder.pos_embed is not None:
+            x = x + self.encoder.pos_embed
+
+        # 3) run through blocks, collect features at fuse_idxs
+        feats = []
+        for idx, blk in enumerate(self.encoder.blocks):
+            x = blk(x)  # (B, Hp, Wp, C)
+            if idx in self.fuse_idxs:
+                feats.append(x.permute(0,3,1,2))  # → (B, C, Hp, Wp)
+
+        # 4) neck on final x
+        x_neck = self.encoder.neck(x.permute(0,3,1,2))  # → (B, out_ch, H*, W*)
+        feats.append(x_neck)
+
+        # 5) fuse multi-scale
+        fused = self.fuser(feats)  # → (B, out_ch, H*, W*)
+
+        # 6) positional encoding + mask decoding
+        pe = self.pe_layer([fused.shape[-2], fused.shape[-1]]).unsqueeze(0)
+        masks, iou = self.decoder(
+            image_embeddings=fused.unsqueeze(1),  # MaskDecoder expects a channel dim at dim=1
+            image_pe=pe,
+        )
+
+        # 7) resize masks back to original
+        if masks.shape[-1] != W0:
+            masks = F.interpolate(masks,
+                                  (W0,W0),
+                                  mode='bilinear', align_corners=False)
+        return masks, iou
+
+
+
+
 class AutoSamSeg(nn.Module):
     def __init__(
         self,
