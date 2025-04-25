@@ -423,11 +423,13 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
             .float()
         )
 
+        alpha = 0.0 if epoch < 20 else 1.0
+
         dist_maps = compute_sdf_per_class(y_onehot)
 
         loss_a = criterion(pred_softmax, y_onehot)
         loss_b = boundary_loss(pred_softmax, dist_maps)
-        loss = loss_a + 0.05 * loss_b
+        loss = loss_a + alpha * loss_b
 
 
 
