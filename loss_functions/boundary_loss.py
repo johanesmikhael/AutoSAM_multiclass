@@ -32,6 +32,12 @@ def compute_sdf_per_class(one_hot_gt: torch.Tensor) -> torch.Tensor:
         sdf[b, c] = torch.from_numpy(compute_sdf(one_hot_gt[b,c].cpu().numpy()))
     return sdf.to(one_hot_gt.device)
 
+def simplex(t: torch.Tensor, axis=1) -> bool:
+    _sum = t.sum(dim=axis)
+    # make a tensor of ones with the same shape and device as _sum
+    ones = torch.ones_like(_sum)
+    return torch.allclose(_sum, ones, atol=1e-4)
+
 class BoundaryLoss(torch.nn.Module):
     def __init__(self, idc: list):
         super().__init__()
@@ -39,7 +45,8 @@ class BoundaryLoss(torch.nn.Module):
 
     def forward(self, probs: torch.Tensor, sdf: torch.Tensor) -> torch.Tensor:
         # probs: (B,C,H,W), softmaxed; sdf: same shape
-        if not torch.allclose(probs.sum(1), 1, atol=1e-4):
+        
+        if not simplex(probs):
             raise ValueError("`probs` must sum to 1 over classes")
         pc = probs[:, self.idc, ...]
         dc = sdf[:,   self.idc, ...]
