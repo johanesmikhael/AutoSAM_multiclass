@@ -69,13 +69,14 @@ def _build_sam_seg_model(
     return sam_seg
 
 
-def build_sam_vit_h_seg_cnn(num_classes=14, residual=False, gated=False, checkpoint=None):
+def build_sam_vit_h_seg_cnn(num_classes=14, fuse_block_indices=[0, 1, 2] ,residual=False, gated=False, checkpoint=None):
     return _build_sam_seg_model(
         encoder_embed_dim=1280,
         encoder_depth=32,
         encoder_num_heads=16,
         encoder_global_attn_indexes=[7, 15, 23, 31],
         num_classes=num_classes,
+        fuse_block_indices=fuse_block_indices,
         residual=residual,
         gated=gated,
         checkpoint=checkpoint,
