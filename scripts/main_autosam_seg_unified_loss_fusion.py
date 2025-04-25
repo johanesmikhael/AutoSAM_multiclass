@@ -117,7 +117,7 @@ parser.add_argument('--uf_delta',  type=float, default=0.6,
                     help="δ parameter (balance of FP/FN)")
 parser.add_argument('--uf_gamma',  type=float, default=0.5,
                     help="γ focal parameter (hard‐example emphasis)")
-parser.add_argument('--residual', type=bool, default=False,
+parser.add_argument('--residual', type=bool, default=False, action='store_true',
                     help='whether to use residual connections in feature fusion')
 
 
