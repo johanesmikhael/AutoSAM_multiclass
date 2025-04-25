@@ -286,13 +286,13 @@ class AutoSamSegWithFusion(nn.Module):
         self.pe_layer = PositionEmbeddingRandom(128)
 
         # the neck's first conv_out channels is what goes into the MaskDecoder:
-        out_ch = self.encoder.neck[0].out_channels
+        out_ch = self.image_encoder.neck[0].out_channels
 
         # gather channel dims for each tapped block + the neck
-        in_chs = [ self.encoder.patch_embed.proj.out_channels ]  # optional: you could include the patch‐embed output too
+        in_chs = [ self.image_encoder.patch_embed.proj.out_channels ]  # optional: you could include the patch‐embed output too
         for i in fuse_block_indices:
             # after block i, feature dim is embed_dim
-            in_chs.append(self.encoder.blocks[i].attn.qkv.in_features)
+            in_chs.append(self.image_encoder.blocks[i].attn.qkv.in_features)
         # finally the neck output
         in_chs.append(out_ch)
 
@@ -303,33 +303,33 @@ class AutoSamSegWithFusion(nn.Module):
         B,_,H0,W0 = x.shape
         # 1) resize to encoder size
         x = F.interpolate(x,
-                          (self.encoder.img_size, self.encoder.img_size),
+                          (self.image_encoder.img_size, self.image_encoder.img_size),
                           mode='bilinear', align_corners=False)
 
         # 2) patch‐embed & abs‐pos
-        x = self.encoder.patch_embed(x)  # → (B, Hp, Wp, C)
-        if self.encoder.pos_embed is not None:
-            x = x + self.encoder.pos_embed
+        x = self.image_encoder.patch_embed(x)  # → (B, Hp, Wp, C)
+        if self.image_encoder.pos_embed is not None:
+            x = x + self.image_encoder.pos_embed
 
         # 3) run through blocks, collect features at fuse_idxs
         feats = []
-        for idx, blk in enumerate(self.encoder.blocks):
+        for idx, blk in enumerate(self.image_encoder.blocks):
             x = blk(x)  # (B, Hp, Wp, C)
             if idx in self.fuse_idxs:
                 feats.append(x.permute(0,3,1,2))  # → (B, C, Hp, Wp)
 
         # 4) neck on final x
-        x_neck = self.encoder.neck(x.permute(0,3,1,2))  # → (B, out_ch, H*, W*)
+        x_neck = self.image_encoder.neck(x.permute(0,3,1,2))  # → (B, out_ch, H*, W*)
         feats.append(x_neck)
 
         # 5) fuse multi-scale
         fused = self.fuser(feats)  # → (B, out_ch, H*, W*)
 
         # 6) positional encoding + mask decoding
-        pe = self.pe_layer([fused.shape[-2], fused.shape[-1]]).unsqueeze(0)
-        masks, iou = self.decoder(
+        img_pe = self.pe_layer([fused.shape[-2], fused.shape[-1]]).unsqueeze(0)
+        masks, iou = self.mask_decoder(
             image_embeddings=fused.unsqueeze(1),  # MaskDecoder expects a channel dim at dim=1
-            image_pe=pe,
+            image_pe=img_pe,
         )
 
         # 7) resize masks back to original
