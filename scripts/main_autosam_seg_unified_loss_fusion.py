@@ -121,6 +121,8 @@ parser.add_argument('--residual', default=False, action='store_true',
                     help='whether to use residual connections in feature fusion')
 parser.add_argument('--gated', default=False, action='store_true',
                     help='whether to use learnable static gate in feature fusion')
+parser.add_argument('--fuse_nlayers', default=3, type=int,
+                    help='number of n-first layers to be fused')
 
 
 def main():
@@ -188,7 +190,14 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.model_type == 'vit_b':
         model_checkpoint = 'cp/sam_vit_b_01ec64.pth'
 
-    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, residual=args.residual, gated=args.gated, checkpoint=model_checkpoint)
+
+    fuse_block_indices = range(args.fuse_nlayers)
+
+    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, 
+                                                           fuse_block_indices=fuse_block_indices,
+                                                           residual=args.residual, 
+                                                           gated=args.gated, 
+                                                           checkpoint=model_checkpoint)
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
