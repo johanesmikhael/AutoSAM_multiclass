@@ -117,6 +117,8 @@ parser.add_argument('--uf_delta',  type=float, default=0.6,
                     help="δ parameter (balance of FP/FN)")
 parser.add_argument('--uf_gamma',  type=float, default=0.5,
                     help="γ focal parameter (hard‐example emphasis)")
+parser.add_argument('--residual', type=bool, default=False,
+                    help='whether to use residual connections in feature fusion')
 
 
 def main():
@@ -184,7 +186,7 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.model_type == 'vit_b':
         model_checkpoint = 'cp/sam_vit_b_01ec64.pth'
 
-    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, checkpoint=model_checkpoint)
+    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, residual=args.residual, checkpoint=model_checkpoint)
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor

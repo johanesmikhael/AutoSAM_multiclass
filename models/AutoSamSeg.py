@@ -261,6 +261,34 @@ class MultiScaleFusion(nn.Module):
         for proj, feat in zip(self.projs, feats):
             fused = fused + proj(feat)
         return fused
+    
+
+class FusionWithPostNorm(nn.Module):
+    def __init__(self, in_chs, out_ch):
+        super().__init__()
+        # your 1×1 projections
+        self.projs = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(in_c, out_ch, kernel_size=1, bias=False),
+                nn.GELU(),
+            )
+            for in_c in in_chs
+        ])
+        # one post‐fusion LayerNorm2d
+        self.post_norm = LayerNorm2d(out_ch)
+
+    def forward(self, feats, orig_neck=None, use_residual=False):
+        # feats: list of [B, in_chs[i], H', W']
+        fused = 0
+        for proj, feat in zip(self.projs, feats):
+            fused = fused + proj(feat)
+
+        if use_residual and orig_neck is not None:
+            fused = fused + orig_neck
+
+        # single normalization after fusion
+        fused = self.post_norm(fused)
+        return fused
 
 
 class AutoSamSegWithFusion(nn.Module):
@@ -268,6 +296,7 @@ class AutoSamSegWithFusion(nn.Module):
                  image_encoder,        # your ViT encoder
                  seg_decoder,         # your MaskDecoder
                  fuse_block_indices=[0, 1, 2],
+                 residual=False,
                  img_size=1024):
         super().__init__()
         self.img_size      = img_size
@@ -289,7 +318,8 @@ class AutoSamSegWithFusion(nn.Module):
         in_chs.append(out_ch)
 
         self.fuse_idxs = list(fuse_block_indices)
-        self.fuser     = MultiScaleFusion(in_chs, out_ch)
+        self.fuser     = FusionWithPostNorm(in_chs, out_ch)
+        self.residual   = residual
 
     def forward(self, x):
         B, _, H0, W0 = x.shape
@@ -317,7 +347,8 @@ class AutoSamSegWithFusion(nn.Module):
         feats.append(x_neck)
 
         # 5) fuse them all
-        fused = self.fuser(feats)  # [B, out_ch, H′, W′]
+        fused = self.fuser(feats, orig_neck=x_neck, use_residual=self.residual)  # [B, out_ch, H′, W′]
+
 
         # 6) positional encoding + mask decode
         Hf, Wf = fused.shape[-2:]
