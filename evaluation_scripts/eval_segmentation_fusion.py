@@ -64,10 +64,14 @@ def evaluate_model(args):
         raise ValueError("Unsupported model type: {}".format(args.model_type))
     
     # Create model using the registry.
+
+    fuse_block_indices = range(args.fuse_nlayers)
+
+
     model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, 
                                                             residual=args.residual,
                                                             gated=args.gated,
-                                                            fuse_nlayers=args.fuse_nlayers,
+                                                            fuse_block_indices=fuse_block_indices,
                                                             checkpoint=base_checkpoint)
     
     # Load the saved checkpoint (decoder + pe_layer).
