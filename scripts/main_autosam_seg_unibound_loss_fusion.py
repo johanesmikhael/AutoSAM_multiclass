@@ -425,7 +425,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
 
         dist_maps = compute_sdf_per_class(y_onehot)
 
-        loss = criterion(pred_softmax, y_onehot) + boundary_loss(pred_softmax, dist_maps)
+        loss = criterion(pred_softmax, y_onehot) + 0.1 * boundary_loss(pred_softmax, dist_maps)
 
 
 
