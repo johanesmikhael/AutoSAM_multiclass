@@ -326,6 +326,7 @@ class AutoSamSegWithFusion(nn.Module):
                  seg_decoder,         # your MaskDecoder
                  fuse_block_indices=[0, 1, 2],
                  residual=False,
+                 gated=False,
                  img_size=1024):
         super().__init__()
         self.img_size      = img_size
@@ -347,7 +348,10 @@ class AutoSamSegWithFusion(nn.Module):
         in_chs.append(out_ch)
 
         self.fuse_idxs = list(fuse_block_indices)
-        self.fuser     = FusionWithPostNorm(in_chs, out_ch)
+        if gated:
+            self.fuser     = StaticGatedFusion(in_chs, out_ch)
+        else:
+            self.fuser     = FusionWithPostNorm(in_chs, out_ch)
         self.residual   = residual
 
     def forward(self, x):

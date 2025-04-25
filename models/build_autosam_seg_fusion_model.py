@@ -15,6 +15,7 @@ def _build_sam_seg_model(
     encoder_global_attn_indexes,
     num_classes,
     residual=False,
+    gated=False,
     checkpoint=None,
 ):
     prompt_embed_dim = 256
@@ -49,6 +50,7 @@ def _build_sam_seg_model(
             num_classes=num_classes,
         ),
         residual=residual,
+        gated=gated
     )
 
     if checkpoint is not None:
@@ -65,7 +67,7 @@ def _build_sam_seg_model(
     return sam_seg
 
 
-def build_sam_vit_h_seg_cnn(num_classes=14, residual=False, checkpoint=None):
+def build_sam_vit_h_seg_cnn(num_classes=14, residual=False, gated=False, checkpoint=None):
     return _build_sam_seg_model(
         encoder_embed_dim=1280,
         encoder_depth=32,
@@ -73,6 +75,7 @@ def build_sam_vit_h_seg_cnn(num_classes=14, residual=False, checkpoint=None):
         encoder_global_attn_indexes=[7, 15, 23, 31],
         num_classes=num_classes,
         residual=residual,
+        gated=gated,
         checkpoint=checkpoint,
     )
 
