@@ -2,48 +2,55 @@ import torch
 from kornia.contrib import DistanceTransform
 
 
-# instantiate once (e.g. at module scope) so the kernel is compiled only once
-_DT = DistanceTransform(kernel_size=3, h=0.35)
-
-def compute_sdf_per_class(one_hot_gt: torch.Tensor) -> torch.Tensor:
+def compute_sdf_per_class(
+    one_hot_gt: torch.Tensor,
+    kernel_size: int = 3,
+    h: float        = 0.35
+) -> torch.Tensor:
     """
-    Vectorized SDF via Kornia’s DistanceTransform, with per‐class normalization
-    and absent‐class → uniform‐penalty (=1) maps.
-
+    Compute signed “distance” maps using Kornia’s DistanceTransform (L1/Chamfer approx).
+    
     Args:
-        one_hot_gt: (B, C, H, W) float or bool on CUDA
+        one_hot_gt: (B, C, H, W) one-hot masks, float or bool on CUDA.
+        kernel_size: size of the chamfer kernel (odd integer).
+        h:         weighting of diagonal steps (typical 0.35–0.5).
+        
     Returns:
-        sdf_penalty: (B, C, H, W) float, φ>0 outside, φ<0 inside,
-                     normalized to [0,1] for present classes and =1 for absent ones.
+        sdf: (B, C, H, W) signed distance maps (positive outside, negative inside).
     """
     B, C, H, W = one_hot_gt.shape
     device     = one_hot_gt.device
-    masks      = one_hot_gt.float().to(device)               # (B,C,H,W)
+    # ensure float for kornia
+    masks = one_hot_gt.float().to(device)
+    dt    = DistanceTransform(kernel_size=kernel_size, h=h).to(device)
 
-    # flatten batch×class into a single batch for DT
-    flat = masks.view(B * C, 1, H, W)
-    inv  = 1.0 - flat
+    # preallocate
+    sdf = torch.empty((B, C, H, W), dtype=torch.float32, device=device)
 
-    # run two big batched transforms
-    _DT.to(device)
-    dist_fg = _DT(flat)   # distance‐to‐foreground: zero inside mask
-    dist_bg = _DT(inv)    # distance‐to‐background: zero outside mask
+    for c in range(C):
+        m = masks[:, c:c+1]      # shape (B,1,H,W)
+        inv = 1.0 - m            # background mask
+        # Manhattan‐approx distance out/in
+        dist_out = dt(inv)       # (B,1,H,W)
+        dist_in  = dt(m)         # (B,1,H,W)
+        sdf[:, c] = -(dist_in-dist_out).squeeze(1)
 
-    # reshape back and form signed‐distance φ = dist_fg – dist_bg
-    sdf = (dist_fg - dist_bg).view(B, C, H, W)
+    # compute per-image, per-class min/max
+    B,C,H,W = sdf.shape
+    mins = sdf.view(B, C, -1).min(dim=-1)[0].view(B, C, 1, 1)
+    maxs = sdf.view(B, C, -1).max(dim=-1)[0].view(B, C, 1, 1)
 
-    # per‐class, per‐image normalization into [0,1]
-    mins  = sdf.amin(dim=(-2, -1), keepdim=True)             # (B,C,1,1)
-    maxs  = sdf.amax(dim=(-2, -1), keepdim=True)             # (B,C,1,1)
+    # denom = max − min, but never below ε
     denom = (maxs - mins).clamp(min=1e-6)
-    sdf_n = (sdf - mins) / denom                             # (B,C,H,W)
 
-    # build a mask of which classes actually appear
-    present = (masks.sum(dim=(-2, -1), keepdim=True) > 0)    # (B,C,1,1)
+    # safe division
+    sdf_norm = (sdf - mins) / denom
 
-    # absent classes get a uniform “1.0” penalty map
-    ones = torch.ones_like(sdf_n)
-    sdf_penalty = torch.where(present, sdf_n, ones)          # (B,C,H,W)
+    # mark present vs absent
+    present = (one_hot_gt.sum(dim=[2,3], keepdim=True) > 0)  # (B,C,1,1)
+    ones    = torch.ones_like(sdf_norm)
+    # absent classes ⇒ full‐weight penalty map =1
+    sdf_penalty = torch.where(present, sdf_norm, ones)
 
     return sdf_penalty
 
