@@ -33,7 +33,7 @@ def compute_sdf_per_class(
         # Manhattan‐approx distance out/in
         dist_out = dt(inv)       # (B,1,H,W)
         dist_in  = dt(m)         # (B,1,H,W)
-        sdf[:, c] = -(dist_in-dist_out).squeeze(1)
+        sdf[:, c] = (dist_in-dist_out).squeeze(1)
 
     # compute per-image, per-class min/max
     B,C,H,W = sdf.shape
