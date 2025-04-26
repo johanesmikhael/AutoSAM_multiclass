@@ -34,7 +34,18 @@ def compute_sdf_per_class(
         dist_in  = dt(m)         # (B,1,H,W)
         sdf[:, c] = (dist_out - dist_in).squeeze(1)
 
-    return sdf
+    # compute per-image, per-class min/max
+    B,C,H,W = sdf.shape
+    mins = sdf.view(B, C, -1).min(dim=-1)[0].view(B, C, 1, 1)
+    maxs = sdf.view(B, C, -1).max(dim=-1)[0].view(B, C, 1, 1)
+
+    # denom = max − min, but never below ε
+    denom = (maxs - mins).clamp(min=1e-6)
+
+    # safe division
+    sdf_normalized = (sdf - mins) / denom
+
+    return sdf_normalized
 
 
 # Your BoundaryLoss stays the same:

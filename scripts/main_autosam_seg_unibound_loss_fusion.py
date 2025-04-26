@@ -423,7 +423,8 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
             .float()
         )
 
-        alpha = 0.0 if epoch < 20 else 1.0
+        # alpha = 0.0 if epoch < 20 else 1.0
+        alpha = 0.1
 
         dist_maps = compute_sdf_per_class(y_onehot)
 
