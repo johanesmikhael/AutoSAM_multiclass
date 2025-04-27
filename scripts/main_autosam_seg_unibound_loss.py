@@ -33,15 +33,16 @@ import json
 
 # from loss_functions.dice_loss import SoftDiceLoss
 from loss_functions.dsc import DiceScoreCoefficient
-from loss_functions.boundary_loss import BoundaryLoss, compute_sdf_per_class, compute_sdf_per_class_b
 # from loss_functions.focal_loss import FocalLoss
+from loss_functions.boundary_loss import BoundaryLoss, compute_sdf_per_class_b
+
 from loss_functions.metrics import dice_pytorch, SegmentationMetric
 
 from loss_functions.unified_loss import (
     symmetric_unified_focal_multiclass,
     asymmetric_unified_focal_multiclass)
 
-from models import sam_seg_fusion_model_registry
+from models import sam_seg_model_registry
 from dataset import generate_dataset, generate_test_loader
 from evaluate import test_synapse, test_acdc, test_brats, test_material
 
@@ -118,14 +119,6 @@ parser.add_argument('--uf_delta',  type=float, default=0.6,
                     help="δ parameter (balance of FP/FN)")
 parser.add_argument('--uf_gamma',  type=float, default=0.5,
                     help="γ focal parameter (hard‐example emphasis)")
-parser.add_argument('--residual', default=False, action='store_true',
-                    help='whether to use residual connections in feature fusion')
-parser.add_argument('--gated', default=False, action='store_true',
-                    help='whether to use learnable static gate in feature fusion')
-parser.add_argument('--fuse_init', default=0, type=int,
-                    help='first layer to be fused')
-parser.add_argument('--fuse_nlayers', default=7, type=int,
-                    help='number of n-first layers to be fused')
 
 
 def main():
@@ -193,14 +186,7 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.model_type == 'vit_b':
         model_checkpoint = 'cp/sam_vit_b_01ec64.pth'
 
-
-    fuse_block_indices = range(args.fuse_init, args.fuse_init+args.fuse_nlayers)
-
-    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, 
-                                                           fuse_block_indices=fuse_block_indices,
-                                                           residual=args.residual, 
-                                                           gated=args.gated, 
-                                                           checkpoint=model_checkpoint)
+    model = sam_seg_model_registry[args.model_type](num_classes=args.num_classes, checkpoint=model_checkpoint)
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
@@ -305,7 +291,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 'epoch': epoch + 1,
                 'mask_decoder_state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
                 'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
-                'fuser_state_dict': (model.module if hasattr(model, 'module') else model).fuser.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, filename=filename)
 
@@ -318,7 +303,6 @@ def main_worker(gpu, ngpus_per_node, args):
             'epoch': args.epochs,
             'mask_decoder_state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
             'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
-            'fuser_state_dict': (model.module if hasattr(model, 'module') else model).fuser.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, is_best=True, filename=final_fname)
 
@@ -434,6 +418,9 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
         loss = loss_a + alpha * loss_b
 
 
+        # loss = criterion(pred_softmax, y_onehot)
+
+
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -448,7 +435,6 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
         if i % args.print_freq == 0:
             print('Train: [{0}][{1}/{2}]\t'
                   'loss {loss:.4f}'.format(epoch, i, len(train_loader), loss=loss.item()))
-            print(f'loss_a: {loss_a.item():.4f}, loss_b: {loss_b.item():.4f}')
 
 
 

@@ -33,7 +33,6 @@ import json
 
 # from loss_functions.dice_loss import SoftDiceLoss
 from loss_functions.dsc import DiceScoreCoefficient
-from loss_functions.boundary_loss import BoundaryLoss, compute_sdf_per_class, compute_sdf_per_class_b
 # from loss_functions.focal_loss import FocalLoss
 from loss_functions.metrics import dice_pytorch, SegmentationMetric
 
@@ -41,7 +40,7 @@ from loss_functions.unified_loss import (
     symmetric_unified_focal_multiclass,
     asymmetric_unified_focal_multiclass)
 
-from models import sam_seg_fusion_model_registry
+from models import sam_seg_dino_model_registry
 from dataset import generate_dataset, generate_test_loader
 from evaluate import test_synapse, test_acdc, test_brats, test_material
 
@@ -194,12 +193,12 @@ def main_worker(gpu, ngpus_per_node, args):
         model_checkpoint = 'cp/sam_vit_b_01ec64.pth'
 
 
-    fuse_block_indices = range(args.fuse_init, args.fuse_init+args.fuse_nlayers)
+    # fuse_block_indices = range(args.fuse_init, args.fuse_init+args.fuse_nlayers)
 
-    model = sam_seg_fusion_model_registry[args.model_type](num_classes=args.num_classes, 
-                                                           fuse_block_indices=fuse_block_indices,
-                                                           residual=args.residual, 
-                                                           gated=args.gated, 
+    model = sam_seg_dino_model_registry[args.model_type](num_classes=args.num_classes, 
+                                                           # fuse_block_indices=fuse_block_indices,
+                                                           # residual=args.residual, 
+                                                           # gated=args.gated, 
                                                            checkpoint=model_checkpoint)
 
     if args.distributed:
@@ -377,7 +376,6 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
             weight=args.uf_weight
         )
     
-    boundary_loss = BoundaryLoss(idc=list(range(1, args.num_classes)))
 
     # switch to train mode
     model.train()
@@ -423,15 +421,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
             .float()
         )
 
-        # alpha = 0.0 if epoch < 20 else 1.0
-        alpha = 1.0
-
-        dist_maps = compute_sdf_per_class_b(y_onehot)
-        # compute_sdf_per_class_b penalize false positives, but perform poorly empirically
-
-        loss_a = criterion(pred_softmax, y_onehot)
-        loss_b = boundary_loss(pred_softmax, dist_maps)
-        loss = loss_a + alpha * loss_b
+        loss = criterion(pred_softmax, y_onehot)
 
 
 
@@ -448,7 +438,6 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
         if i % args.print_freq == 0:
             print('Train: [{0}][{1}/{2}]\t'
                   'loss {loss:.4f}'.format(epoch, i, len(train_loader), loss=loss.item()))
-            print(f'loss_a: {loss_a.item():.4f}, loss_b: {loss_b.item():.4f}')
 
 
 
