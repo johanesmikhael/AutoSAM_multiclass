@@ -435,6 +435,8 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
         if i % args.print_freq == 0:
             print('Train: [{0}][{1}/{2}]\t'
                   'loss {loss:.4f}'.format(epoch, i, len(train_loader), loss=loss.item()))
+            print(f'loss_a: {loss_a.item():.4f}, loss_b: {loss_b.item():.4f}')
+
 
 
 
