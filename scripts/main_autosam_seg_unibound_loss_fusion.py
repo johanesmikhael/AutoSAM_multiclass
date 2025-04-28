@@ -122,6 +122,8 @@ parser.add_argument('--residual', default=False, action='store_true',
                     help='whether to use residual connections in feature fusion')
 parser.add_argument('--gated', default=False, action='store_true',
                     help='whether to use learnable static gate in feature fusion')
+parser.add_argument('--concat', default=False, action='store_true',
+                    help='whether to use concat feature fusion')
 parser.add_argument('--fuse_init', default=0, type=int,
                     help='first layer to be fused')
 parser.add_argument('--fuse_nlayers', default=7, type=int,
@@ -200,6 +202,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                                            fuse_block_indices=fuse_block_indices,
                                                            residual=args.residual, 
                                                            gated=args.gated, 
+                                                           concat=args.concat,
                                                            checkpoint=model_checkpoint)
 
     if args.distributed:

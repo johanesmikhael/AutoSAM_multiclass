@@ -361,6 +361,34 @@ class MultiScaleFusion(nn.Module):
         return fused
     
 
+class FusionWithPostNorm(nn.Module):
+    def __init__(self, in_chs, out_ch):
+        super().__init__()
+        # your 1×1 projections
+        self.projs = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(in_c, out_ch, kernel_size=1, bias=False),
+                nn.GELU(),
+            )
+            for in_c in in_chs
+        ])
+        # one post‐fusion LayerNorm2d
+        self.post_norm = LayerNorm2d(out_ch)
+
+    def forward(self, feats, orig_neck=None, use_residual=False):
+        # feats: list of [B, in_chs[i], H', W']
+        fused = 0
+        for proj, feat in zip(self.projs, feats):
+            fused = fused + proj(feat)
+
+        if use_residual and orig_neck is not None:
+            fused = fused + orig_neck
+
+        # single normalization after fusion
+        fused = self.post_norm(fused)
+        return fused
+    
+
 class StaticGatedFusion(nn.Module):
     def __init__(self, in_chs, out_ch):
         super().__init__()
@@ -388,34 +416,27 @@ class StaticGatedFusion(nn.Module):
 
         return fused
 
-    
 
-class FusionWithPostNorm(nn.Module):
+class ConcatFusion(nn.Module):
     def __init__(self, in_chs, out_ch):
+        """
+        in_chs: list of channel counts for each feature in feats
+        out_ch: desired output channels (must match mask‐decoder input)
+        """
         super().__init__()
-        # your 1×1 projections
-        self.projs = nn.ModuleList([
-            nn.Sequential(
-                nn.Conv2d(in_c, out_ch, kernel_size=1, bias=False),
-                nn.GELU(),
-            )
-            for in_c in in_chs
-        ])
-        # one post‐fusion LayerNorm2d
-        self.post_norm = LayerNorm2d(out_ch)
+        self.fuse = nn.Sequential(
+            nn.Conv2d(sum(in_chs), out_ch, kernel_size=1, bias=False),
+            nn.GELU(),
+            LayerNorm2d(out_ch),
+        )
 
     def forward(self, feats, orig_neck=None, use_residual=False):
-        # feats: list of [B, in_chs[i], H', W']
-        fused = 0
-        for proj, feat in zip(self.projs, feats):
-            fused = fused + proj(feat)
-
+        # feats: list of [B, C_i, H, W]
+        x = torch.cat(feats, dim=1)           # → [B, sum(C_i), H, W]
+        out = self.fuse(x)                    # → [B, out_ch, H, W]
         if use_residual and orig_neck is not None:
-            fused = fused + orig_neck
-
-        # single normalization after fusion
-        fused = self.post_norm(fused)
-        return fused
+            out = out + orig_neck
+        return out
 
 
 class AutoSamSegWithFusion(nn.Module):
@@ -425,6 +446,7 @@ class AutoSamSegWithFusion(nn.Module):
                  fuse_block_indices=[0, 1, 2],
                  residual=False,
                  gated=False,
+                 concat=False,
                  img_size=1024):
         super().__init__()
         self.img_size      = img_size
@@ -448,6 +470,8 @@ class AutoSamSegWithFusion(nn.Module):
         self.fuse_idxs = list(fuse_block_indices)
         if gated:
             self.fuser     = StaticGatedFusion(in_chs, out_ch)
+        elif concat:
+            self.fuser     = ConcatFusion(in_chs, out_ch)
         else:
             self.fuser     = FusionWithPostNorm(in_chs, out_ch)
         self.residual   = residual
@@ -495,6 +519,86 @@ class AutoSamSegWithFusion(nn.Module):
                                   (W0, W0),
                                   mode='bilinear', align_corners=False)
         return masks, iou
+
+    
+
+
+class AutoSamSegWithConcatFusion(nn.Module):
+    def __init__(self,
+                 image_encoder,       # your ViT encoder
+                 seg_decoder,        # your MaskDecoder
+                 fuse_block_indices=[0,1,2],
+                 residual=False,
+                 img_size=1024):
+        super().__init__()
+        self.img_size      = img_size
+        self.image_encoder = image_encoder
+        self.mask_decoder  = seg_decoder
+        self.pe_layer      = PositionEmbeddingRandom(128)
+
+        # how many channels the neck spits out into MaskDecoder:
+        out_ch = self.image_encoder.neck[0].out_channels
+
+        # build list of input‐channels for each skip + final neck:
+        in_chs = []
+        for i in fuse_block_indices:
+            # each block outputs [B, Hp, Wp, embed_dim]
+            # so the channel dimension is embed_dim
+            embed_dim = self.image_encoder.blocks[i].attn.qkv.in_features
+            in_chs.append(embed_dim)
+        # finally include the neck output channels:
+        in_chs.append(out_ch)
+
+        self.fuse_idxs = list(fuse_block_indices)
+        self.residual  = residual
+
+        # ** here is the concatenate + 1×1 fusion **
+        self.fuser = ConcatFusion(in_chs, out_ch)
+
+    def forward(self, x):
+        B, _, H0, W0 = x.shape
+
+        # 1) resize
+        x = F.interpolate(x,
+                          (self.img_size, self.img_size),
+                          mode='bilinear', align_corners=False)
+
+        # 2) patch‐embed + abs‐pos
+        x = self.image_encoder.patch_embed(x)  # [B, Hp, Wp, C]
+        if self.image_encoder.pos_embed is not None:
+            x = x + self.image_encoder.pos_embed
+
+        # 3) run through blocks & collect skips
+        feats = []
+        for idx, blk in enumerate(self.image_encoder.blocks):
+            x = blk(x)  # [B, Hp, Wp, C]
+            if idx in self.fuse_idxs:
+                feats.append(x.permute(0,3,1,2))  # → [B, C, Hp, Wp]
+
+        # 4) neck on the *last* x
+        x_neck = self.image_encoder.neck(x.permute(0,3,1,2))  # [B, out_ch, H′, W′]
+        feats.append(x_neck)
+
+        # 5) fuse them all by concat + 1×1 conv
+        fused = self.fuser(feats,
+                           orig_neck=x_neck,
+                           use_residual=self.residual)  # [B, out_ch, H′, W′]
+
+        # 6) positional encoding + mask decode
+        Hf, Wf = fused.shape[-2:]
+        img_pe = self.pe_layer([Hf, Wf]).unsqueeze(0)
+        masks, iou = self.mask_decoder(
+            image_embeddings=fused.unsqueeze(1),
+            image_pe=img_pe,
+        )
+
+        # 7) back to original
+        if masks.shape[-1] != W0:
+            masks = F.interpolate(masks,
+                                  (W0, W0),
+                                  mode='bilinear', align_corners=False)
+        return masks, iou
+    
 
 
 

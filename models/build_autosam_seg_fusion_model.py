@@ -69,7 +69,7 @@ def _build_sam_seg_model(
     return sam_seg
 
 
-def build_sam_vit_h_seg_cnn(num_classes=14, fuse_block_indices=[0, 1, 2] ,residual=False, gated=False, checkpoint=None):
+def build_sam_vit_h_seg_cnn(num_classes=14, fuse_block_indices=[0, 1, 2] ,residual=False, gated=False, concat=False, checkpoint=None):
     return _build_sam_seg_model(
         encoder_embed_dim=1280,
         encoder_depth=32,
@@ -79,6 +79,7 @@ def build_sam_vit_h_seg_cnn(num_classes=14, fuse_block_indices=[0, 1, 2] ,residu
         fuse_block_indices=fuse_block_indices,
         residual=residual,
         gated=gated,
+        concat=concat,
         checkpoint=checkpoint,
     )
 
