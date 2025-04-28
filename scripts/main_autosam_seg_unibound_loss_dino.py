@@ -33,6 +33,8 @@ import json
 
 # from loss_functions.dice_loss import SoftDiceLoss
 from loss_functions.dsc import DiceScoreCoefficient
+from loss_functions.boundary_loss import BoundaryLoss, compute_sdf_per_class, compute_sdf_per_class_b
+
 # from loss_functions.focal_loss import FocalLoss
 from loss_functions.metrics import dice_pytorch, SegmentationMetric
 
@@ -191,15 +193,39 @@ def main_worker(gpu, ngpus_per_node, args):
         model_checkpoint = 'cp/sam_vit_l_0b3195.pth'
     elif args.model_type == 'vit_b':
         model_checkpoint = 'cp/sam_vit_b_01ec64.pth'
+    
 
+    dino_encoder = torch.hub.load(
+        'facebookresearch/dinov2',
+        'dinov2_vits14_reg',
+        pretrained=False,   # ← don’t fetch the official weights
+    )
 
     # fuse_block_indices = range(args.fuse_init, args.fuse_init+args.fuse_nlayers)
 
     model = sam_seg_dino_model_registry[args.model_type](num_classes=args.num_classes, 
                                                            # fuse_block_indices=fuse_block_indices,
                                                            # residual=args.residual, 
-                                                           # gated=args.gated, 
+                                                           # gated=args.gated,
+                                                           dino_encoder= dino_encoder,
                                                            checkpoint=model_checkpoint)
+    
+
+    dino_checkpoint = 'cp/dinov2_vits14_reg4_pretrain.pth'
+    dino_ckpt = torch.load(dino_checkpoint)
+
+    # if isinstance(dino_ckpt, dict) and not any(k.startswith('model') for k in dino_ckpt):
+    dino_state_dict = dino_ckpt
+
+    model.dino_encoder.load_state_dict(dino_state_dict, strict=True)
+    
+
+    model.dino_encoder.eval()
+    for p in model.dino_encoder.parameters():
+        p.requires_grad = False
+    
+
+
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
@@ -232,12 +258,18 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
     # freeze weights in the image_encoder
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad and "image_encoder" in name or "iou" in name:
+    #         param.requires_grad = False
+    #     else:
+    #         param.requires_grad = True
+        # param.requires_grad = True
+
     for name, param in model.named_parameters():
-        if param.requires_grad and "image_encoder" in name or "iou" in name:
+        if any(x in name for x in ("image_encoder", "dino_encoder", "iou")):
             param.requires_grad = False
         else:
             param.requires_grad = True
-        # param.requires_grad = True
 
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
     scheduler = ReduceLROnPlateau(optimizer, 'max')
@@ -304,7 +336,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 'epoch': epoch + 1,
                 'mask_decoder_state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
                 'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
-                'fuser_state_dict': (model.module if hasattr(model, 'module') else model).fuser.state_dict(),
+                'alpha_state_dict': (model.module if hasattr(model, 'module') else model).alpha.state_dict(),
+                'dino_conv_state_dict': (model.module if hasattr(model, 'module') else model).dino_conv.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, filename=filename)
 
@@ -317,7 +350,8 @@ def main_worker(gpu, ngpus_per_node, args):
             'epoch': args.epochs,
             'mask_decoder_state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
             'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
-            'fuser_state_dict': (model.module if hasattr(model, 'module') else model).fuser.state_dict(),
+            'alpha_state_dict': (model.module if hasattr(model, 'module') else model).alpha.state_dict(),
+            'dino_conv_state_dict': (model.module if hasattr(model, 'module') else model).dino_conv.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, is_best=True, filename=final_fname)
 
@@ -376,6 +410,8 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
             weight=args.uf_weight
         )
     
+    boundary_loss = BoundaryLoss(idc=list(range(1, args.num_classes)))
+
 
     # switch to train mode
     model.train()
@@ -421,7 +457,15 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
             .float()
         )
 
-        loss = criterion(pred_softmax, y_onehot)
+        # alpha = 0.0 if epoch < 20 else 1.0
+        alpha = 1.0
+
+        dist_maps = compute_sdf_per_class_b(y_onehot)
+        # compute_sdf_per_class_b penalize false positives, but perform poorly empirically
+
+        loss_a = criterion(pred_softmax, y_onehot)
+        loss_b = boundary_loss(pred_softmax, dist_maps)
+        loss = loss_a + alpha * loss_b
 
 
 
@@ -438,7 +482,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
         if i % args.print_freq == 0:
             print('Train: [{0}][{1}/{2}]\t'
                   'loss {loss:.4f}'.format(epoch, i, len(train_loader), loss=loss.item()))
-
+            print(f'loss_a: {loss_a.item():.4f}, loss_b: {loss_b.item():.4f}')
 
 
 

@@ -6,5 +6,6 @@ from .build_autosam_seg_gabor_model2 import sam_seg_gabor_model_registry2
 from .build_autosam_seg_gabor_model3 import sam_seg_gabor_model_registry3
 from .build_sam_feat_seg_model import sam_feat_seg_model_registry
 from .build_autosam_seg_fusion_model import sam_seg_fusion_model_registry
+from .build_autosam_seg_dino_model import sam_seg_dino_model_registry
 from .unet_con import SupConUnet
 from .UNET import NestedUNet

@@ -147,6 +147,7 @@ class AutoSamSegGabor(nn.Module):
 
 
 
+
 class AutoSamSegGabor2(nn.Module):
     def __init__(
         self,
@@ -239,6 +240,101 @@ class AutoSamSegGabor2(nn.Module):
         return nn.functional.adaptive_avg_pool2d(emb, 1).squeeze()
     
 
+class AutoSamSegDino(nn.Module):
+    def __init__(
+        self,
+        image_encoder: nn.Module,
+        seg_decoder: nn.Module,
+        dino_encoder: nn.Module,
+        img_size: int = 1024,
+    ):
+        super().__init__()
+        self.img_size = img_size
+        self.image_encoder = image_encoder
+        self.mask_decoder = seg_decoder
+        self.pe_layer = PositionEmbeddingRandom(128)
+        self.dino_encoder = dino_encoder
+
+
+        self.alpha = nn.Parameter(torch.tensor(0.5))
+     
+
+        # Small conv: 12->out_chans
+        out_chans = self.image_encoder.neck[0].out_channels
+        dino_dim = self.dino.embed_dim
+        self.dino_conv = nn.Sequential(
+            nn.Conv2d(dino_dim, out_chans, kernel_size=1, padding=1, bias=False),
+            nn.GELU(),
+        )
+
+
+    def forward(self, x: torch.Tensor):
+        B, C, H, W = x.shape
+        original_size = W
+
+        # 1) resize for encoder
+        x = F.interpolate(
+            x,
+            (self.image_encoder.img_size, self.image_encoder.img_size),
+            mode="bilinear",
+            align_corners=False,
+        )
+
+
+        # 2) frozen image features
+        with torch.no_grad():
+            img_emb = self.image_encoder(x)  # (B,D,H',W')
+
+            
+        Hf, Wf = img_emb.shape[-2:]
+
+        # 3) DINOv2 inference at 896x896
+        x_dino = F.interpolate(x, (896, 896),
+                               mode="bilinear", align_corners=False)
+        with torch.inference_mode():
+            feats = self.dino.forward_features(x_dino)
+        patch_tokens = feats['x_norm_patchtokens']  # (B, Np, D)
+
+        # 4) Reshape to 2D grid
+        Np = patch_tokens.shape[1]
+        # gh = gw = int(Np ** 0.5)
+        tokens_2d = patch_tokens.transpose(1, 2).reshape(B, -1, Hf, Wf)  # (B, D, gh, gw)
+
+        # 5) Upsample DINO tokens to SAM feature map
+        # tok_up = F.interpolate(tokens_2d, size=(Hf, Wf),
+        #                        mode="bilinear", align_corners=False)
+       
+        dino_emb = self.dino_conv(tokens_2d)  # (B, out_chans, Hf, Wf)
+
+        # Fuse with learnable alpha
+        fused = self.alpha * dino_emb + (1 - self.alpha) * img_emb
+
+        # 5) positional encoding
+        Hf, Wf = fused.shape[-2:]
+        img_pe = self.pe_layer([Hf, Wf]).unsqueeze(0)  # (1,D,Hf,Wf)
+
+        # 7) decode
+        mask, iou_pred = self.mask_decoder(
+            image_embeddings=fused.unsqueeze(1),
+            image_pe=img_pe,
+        )
+
+        # 8) resize back
+        if mask.shape[-1] != original_size:
+            mask = F.interpolate(
+                mask, (original_size,)*2,
+                mode='bilinear', align_corners=False
+            )
+        return mask, iou_pred
+
+    def get_embedding(self, x: torch.Tensor):
+        x = F.interpolate(
+            x, (self.img_size,)*2,
+            mode="bilinear", align_corners=False,
+        )
+        emb = self.image_encoder(x)
+        return nn.functional.adaptive_avg_pool2d(emb, 1).squeeze()
+    
 
 class MultiScaleFusion(nn.Module):
     def __init__(self, in_chs, out_ch):

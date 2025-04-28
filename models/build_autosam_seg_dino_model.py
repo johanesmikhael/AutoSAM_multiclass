@@ -14,9 +14,10 @@ def _build_sam_seg_model(
     encoder_num_heads,
     encoder_global_attn_indexes,
     num_classes,
-    fuse_block_indices=[0, 1, 2],
-    residual=False,
-    gated=False,
+    # fuse_block_indices=[0, 1, 2],
+    # residual=False,
+    # gated=False,
+    dino_encoder=None,
     checkpoint=None,
 ):
     prompt_embed_dim = 256
@@ -50,6 +51,7 @@ def _build_sam_seg_model(
             iou_head_hidden_dim=256,
             num_classes=num_classes,
         ),
+        dino_encoder=dino_encoder
         # fuse_block_indices=fuse_block_indices,
         # residual=residual,
         # gated=gated
