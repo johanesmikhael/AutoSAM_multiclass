@@ -294,7 +294,7 @@ class AutoSamSegWithDino(nn.Module):
 
         
         with torch.inference_mode():
-            feats = self.dino.forward_features(x_dino)
+            feats = self.dino_encoder.forward_features(x_dino)
         patch_tokens = feats['x_norm_patchtokens']  # (B, Np, D)
 
         # 4) Reshape to 2D grid
