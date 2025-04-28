@@ -240,7 +240,7 @@ class AutoSamSegGabor2(nn.Module):
         return nn.functional.adaptive_avg_pool2d(emb, 1).squeeze()
     
 
-class AutoSamSegDino(nn.Module):
+class AutoSamSegWithDino(nn.Module):
     def __init__(
         self,
         image_encoder: nn.Module,
@@ -272,6 +272,10 @@ class AutoSamSegDino(nn.Module):
         B, C, H, W = x.shape
         original_size = W
 
+        # 3) DINOv2 inference at 896x896
+        x_dino = F.interpolate(x, (896, 896),
+                               mode="bilinear", align_corners=False)
+
         # 1) resize for encoder
         x = F.interpolate(
             x,
@@ -288,9 +292,7 @@ class AutoSamSegDino(nn.Module):
             
         Hf, Wf = img_emb.shape[-2:]
 
-        # 3) DINOv2 inference at 896x896
-        x_dino = F.interpolate(x, (896, 896),
-                               mode="bilinear", align_corners=False)
+        
         with torch.inference_mode():
             feats = self.dino.forward_features(x_dino)
         patch_tokens = feats['x_norm_patchtokens']  # (B, Np, D)
