@@ -17,6 +17,7 @@ def _build_sam_seg_model(
     fuse_block_indices=[0, 1, 2],
     residual=False,
     gated=False,
+    concat=False,
     checkpoint=None,
 ):
     prompt_embed_dim = 256
@@ -52,7 +53,8 @@ def _build_sam_seg_model(
         ),
         fuse_block_indices=fuse_block_indices,
         residual=residual,
-        gated=gated
+        gated=gated,
+        concat=concat,
     )
 
     if checkpoint is not None:
