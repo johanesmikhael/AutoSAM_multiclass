@@ -261,7 +261,7 @@ class AutoSamSegWithDino(nn.Module):
 
         # Small conv: 12->out_chans
         out_chans = self.image_encoder.neck[0].out_channels
-        dino_dim = self.dino.embed_dim
+        dino_dim = self.dino_encoder.embed_dim
         self.dino_conv = nn.Sequential(
             nn.Conv2d(dino_dim, out_chans, kernel_size=1, padding=1, bias=False),
             nn.GELU(),
