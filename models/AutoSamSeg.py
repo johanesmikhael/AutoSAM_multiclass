@@ -256,7 +256,7 @@ class AutoSamSegWithDino(nn.Module):
         self.dino_encoder = dino_encoder
 
 
-        self.alpha = nn.Parameter(torch.tensor(0.5))
+        self.alpha = 0.9
      
 
         # Small conv: 12->out_chans

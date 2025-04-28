@@ -336,7 +336,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'epoch': epoch + 1,
                 'mask_decoder_state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
                 'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
-                'dino_alpha': (model.module if hasattr(model, 'module') else model).alpha.detach().cpu(),
+                # 'dino_alpha': (model.module if hasattr(model, 'module') else model).alpha.detach().cpu(),
                 'dino_conv_state_dict': (model.module if hasattr(model, 'module') else model).dino_conv.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, filename=filename)
@@ -350,7 +350,7 @@ def main_worker(gpu, ngpus_per_node, args):
             'epoch': args.epochs,
             'mask_decoder_state_dict': (model.module if hasattr(model, 'module') else model).mask_decoder.state_dict(),
             'pe_layer_state_dict': (model.module if hasattr(model, 'module') else model).pe_layer.state_dict(),
-            'dino_alpha': (model.module if hasattr(model, 'module') else model).alpha.detach().cpu(),
+            # 'dino_alpha': (model.module if hasattr(model, 'module') else model).alpha.detach().cpu(),
             'dino_conv_state_dict': (model.module if hasattr(model, 'module') else model).dino_conv.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, is_best=True, filename=final_fname)
