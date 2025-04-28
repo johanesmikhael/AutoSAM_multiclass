@@ -293,7 +293,7 @@ class AutoSamSegWithDino(nn.Module):
         Hf, Wf = img_emb.shape[-2:]
 
         
-        with torch.inference_mode():
+        with torch.no_grad():
             feats = self.dino_encoder.forward_features(x_dino)
         patch_tokens = feats['x_norm_patchtokens']  # (B, Np, D)
 
