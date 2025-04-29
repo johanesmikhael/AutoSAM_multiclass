@@ -7,6 +7,8 @@ import pickle
 from PIL import Image
 
 from models import sam_seg_model_registry
+from models.sam_decoder import GaussianSmoothing
+
 from dataset import generate_test_loader
 from evaluate import test_material
 import random
@@ -44,6 +46,8 @@ def parse_args():
                     help='number of data loading workers (default: 1)'),
     parser.add_argument('--seed', type=int, default=None,
                         help='seed for reproducibility')
+    parser.add_argument('--gaussiansmoothing', default=False, action='store_true',
+                    help='whether to use Gaussian smoothing on the output masks')
     return parser.parse_args()
 
 def evaluate_model(args):
@@ -87,6 +91,18 @@ def evaluate_model(args):
     
     model.eval()
 
+    if args.gaussiansmoothing:
+        print("Using Gaussian smoothing on the output masks")
+        device = next(model.parameters()).device
+        # num_classes = model.mask_decoder.num_mask_tokens  if you want to smooth all mask tokens
+        # here we smooth exactly the output channels (num_classes)
+        smoother = GaussianSmoothing(
+            channels=args.num_classes,
+            kernel_size=11,     # or expose via args
+            sigma=1.0          # or expose via args
+        ).to(device)
+        smoother.eval()
+
     # Prepare directories for saving predictions and labels.
     infer_dir = os.path.join(args.save_dir, "infer")
     label_dir = os.path.join(args.save_dir, "label")
@@ -116,6 +132,9 @@ def evaluate_model(args):
                 mask, _ = model(img)
                 mask = mask.view(b, -1, h, w)
                 mask_softmax = F.softmax(mask, dim=1)
+                if args.gaussiansmoothing:
+                    with torch.no_grad():
+                        mask_softmax = smoother(mask_softmax)
                 mask_pred = torch.argmax(mask_softmax, dim=1)
                 preds.append(mask_pred.cpu().numpy())
                 labels.append(label.cpu().numpy())

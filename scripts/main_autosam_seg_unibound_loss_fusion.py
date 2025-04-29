@@ -456,7 +456,7 @@ def train(train_loader, model, optimizer, scheduler, epoch, args, writer):
 
 
 
-def compute_rare_classes_percentile(train_loader, num_classes, percentile=40):
+def compute_rare_classes_percentile(train_loader, num_classes, percentile=30):
     """
     Identify 'rare' classes as those whose pixel‐frequency falls below
     the given percentile of the class‐frequency distribution.
