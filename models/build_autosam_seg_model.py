@@ -50,26 +50,45 @@ def _build_sam_seg_model(
     )
 
     if checkpoint is not None:
-        with open(checkpoint, "rb") as f:
-            state_dict = torch.load(f)
+        # 1) Load the full checkpoint dict
+        ckpt = torch.load(checkpoint)
+        # (or ckpt = ckpt["model"] if your file nests it)
 
-        loaded_keys = {}
-        for k, v in state_dict.items():
-            # only keep keys that
-            # 1) actually exist in your model
-            # 2) aren’t part of IOU heads
-            # 3) aren’t mask tokens
-            # 4) aren’t in the prompt_encoder
-            if (
-                k in sam_seg.state_dict().keys()
-                and 'iou' not in k
-                and 'mask_tokens' not in k
-                and not k.startswith('prompt_encoder.')
-            ):
-                loaded_keys[k] = v
+        # 2) Split into two dicts:
+        #    - encoder_ckpt: keys for image_encoder.*, stripped of that prefix
+        #    - rest_ckpt: all the other keys you want to load non‐strictly
+        encoder_ckpt = {}
+        rest_ckpt = {}
+        for k, v in ckpt.items():
+            if not k in sam_seg.state_dict():
+                continue
+            # pick off your encoder weights
+            if k.startswith("image_encoder."):
+                # strip the module prefix so it matches ImageEncoderViT.state_dict()
+                stripped = k[len("image_encoder."):]
+                encoder_ckpt[stripped] = v
+            else:
+                # filter out IOU heads, mask tokens, prompt_encoder, etc.
+                if (
+                    'iou' not in k
+                    and 'mask_tokens' not in k
+                    and not k.startswith("prompt_encoder.")
+                ):
+                    rest_ckpt[k] = v
 
-        sam_seg.load_state_dict(loaded_keys, strict=True)
-        print("loaded keys:", loaded_keys.keys())
+        # 3) Strict‐load the encoder
+        missing_e, unexpected_e = sam_seg.image_encoder.load_state_dict(
+            encoder_ckpt, strict=True
+        )
+        print("ImageEncoder missing keys:", missing_e)
+        print("ImageEncoder unexpected keys:", unexpected_e)
+
+        # 4) Non‐strict‐load the rest into the full SAM model
+        missing_r, unexpected_r = sam_seg.load_state_dict(
+            rest_ckpt, strict=False
+        )
+        print("Rest (decoder, etc.) missing keys:", missing_r)
+        print("Rest unexpected keys:", unexpected_r)
 
     return sam_seg
 
