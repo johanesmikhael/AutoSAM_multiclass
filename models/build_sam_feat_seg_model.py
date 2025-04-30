@@ -35,7 +35,7 @@ def _build_feat_seg_model(
             out_chans=prompt_embed_dim,
         ),
         #seg_decoder=SegDecoderLinear(num_classes=num_classes),
-        seg_decoder=SegDecoderCNN(num_classes=num_classes, num_depth=4)
+        seg_decoder=SegDecoderCNN(num_classes=num_classes, num_depth=2)
     )
 
     if checkpoint is not None:
