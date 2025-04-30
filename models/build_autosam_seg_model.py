@@ -54,10 +54,21 @@ def _build_sam_seg_model(
             state_dict = torch.load(f)
 
         loaded_keys = {}
-        for k in state_dict.keys():
-            if k in sam_seg.state_dict().keys() and 'iou'not in k and "mask_tokens" not in k:
-                loaded_keys[k] = state_dict[k]
-        sam_seg.load_state_dict(loaded_keys, strict=False)
+        for k, v in state_dict.items():
+            # only keep keys that
+            # 1) actually exist in your model
+            # 2) aren’t part of IOU heads
+            # 3) aren’t mask tokens
+            # 4) aren’t in the prompt_encoder
+            if (
+                k in sam_seg.state_dict().keys()
+                and 'iou' not in k
+                and 'mask_tokens' not in k
+                and not k.startswith('prompt_encoder.')
+            ):
+                loaded_keys[k] = v
+
+        sam_seg.load_state_dict(loaded_keys, strict=True)
         print("loaded keys:", loaded_keys.keys())
 
     return sam_seg
