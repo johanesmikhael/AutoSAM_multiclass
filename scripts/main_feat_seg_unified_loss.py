@@ -176,11 +176,11 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
 
     if args.model_type=='vit_h':
-        model_checkpoint = 'sam_vit_h_4b8939.pth'
+        model_checkpoint = 'cp/sam_vit_h_4b8939.pth'
     elif args.model_type == 'vit_l':
-        model_checkpoint = 'sam_vit_l_0b3195.pth'
+        model_checkpoint = 'cp/sam_vit_l_0b3195.pth'
     elif args.model_type == 'vit_b':
-        model_checkpoint = 'sam_vit_b_01ec64.pth'
+        model_checkpoint = 'cp/sam_vit_b_01ec64.pth'
 
     model = sam_feat_seg_model_registry[args.model_type](num_classes=args.num_classes, checkpoint=model_checkpoint)
 
