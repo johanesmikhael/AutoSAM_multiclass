@@ -559,7 +559,7 @@ def test(model, args):
                 preds.append(mask.cpu().numpy())
                 labels.append(label.cpu().numpy())
             preds = np.concatenate(preds, axis=0)
-            labels = np.concatenate(labels, axis=0).squeeze()
+            labels = np.concatenate(labels, axis=0)
             print(preds.shape, labels.shape)
             if "." in key:
                 key = key.split(".")[0]
